@@ -1,0 +1,102 @@
+// --- Rarity ---
+
+export const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+export type Rarity = (typeof RARITIES)[number];
+
+export const RARITY_WEIGHTS: Record<Rarity, number> = {
+  common: 50,
+  uncommon: 25,
+  rare: 15,
+  epic: 8,
+  legendary: 2,
+};
+
+export const RARITY_STARS: Record<Rarity, string> = {
+  common: '★',
+  uncommon: '★★',
+  rare: '★★★',
+  epic: '★★★★',
+  legendary: '★★★★★',
+};
+
+// --- Stats ---
+
+export const STAT_NAMES = ['INSIGHT', 'CREATIVITY', 'FOCUS', 'EMPATHY', 'WIT'] as const;
+export type StatName = (typeof STAT_NAMES)[number];
+
+// --- Species ---
+
+export const SPECIES = [
+  'compilox', 'buggnaw', 'deplorix', 'kubrik', 'hashling', 'querrix',   // Tech
+  'fernox', 'glacielle', 'pyroclaw', 'tideling', 'galecrest', 'terravox', // Nature
+  'musinox', 'spectrox', 'chronark', 'voidling', 'paradawn', 'infinik',  // Abstract
+  'drakemaw', 'ashphoenix', 'umbrawl', 'stellix', 'levianthan', 'mythora', // Mythic
+  'termikitty', 'capybrix', 'owlette', 'penguink', 'snailore', 'foxember', // Companion
+] as const;
+export type Species = (typeof SPECIES)[number];
+
+export const SPECIES_CATEGORIES: Record<string, Species[]> = {
+  tech: ['compilox', 'buggnaw', 'deplorix', 'kubrik', 'hashling', 'querrix'],
+  nature: ['fernox', 'glacielle', 'pyroclaw', 'tideling', 'galecrest', 'terravox'],
+  abstract: ['musinox', 'spectrox', 'chronark', 'voidling', 'paradawn', 'infinik'],
+  mythic: ['drakemaw', 'ashphoenix', 'umbrawl', 'stellix', 'levianthan', 'mythora'],
+  companion: ['termikitty', 'capybrix', 'owlette', 'penguink', 'snailore', 'foxember'],
+};
+
+// --- Eyes & Hats ---
+
+export const EYES = ['·', '✦', '×', '◉', '@', '°'] as const;
+export type Eye = (typeof EYES)[number];
+
+export const HATS = ['none', 'crown', 'tophat', 'propeller', 'halo', 'wizard', 'beanie'] as const;
+export type Hat = (typeof HATS)[number];
+
+// --- Bones (deterministic from hash) ---
+
+export interface ClawmonBones {
+  species: Species;
+  rarity: Rarity;
+  eye: Eye;
+  hat: Hat;
+  shiny: boolean;
+  stats: Record<StatName, number>;
+}
+
+// --- Soul (model-generated on hatch) ---
+
+export interface ClawmonSoul {
+  name: string;
+  personality: string;
+  catchphrase: string;
+  voice: string; // description of how they speak
+}
+
+// --- Full Clawmon ---
+
+export interface Clawmon {
+  id: string;
+  bones: ClawmonBones;
+  soul: ClawmonSoul;
+  roleId: string; // role from ROLES registry
+  hatchedAt: string; // ISO date
+  interactions: number;
+}
+
+// --- Config ---
+
+export interface ClawmonConfig {
+  version: string;
+  userId: string;
+  clawmons: string[]; // list of clawmon IDs (directory names)
+}
+
+// --- Memory ---
+
+export interface MemoryEntry {
+  name: string;
+  description: string;
+  type: 'observation' | 'pattern' | 'preference' | 'fact' | 'goal' | 'insight';
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
