@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ClawmonBones, ClawmonSoul, Clawmon, MemoryEntry } from './types.js';
 import type { Role } from './roles.js';
 import { RARITY_STARS } from './types.js';
+import { createSkillRegistry } from './skills/registry.js';
+import { saveMemory } from './memory/store.js';
 
 let client: Anthropic | null = null;
 
@@ -52,7 +54,6 @@ The personality should feel warm, distinct, and slightly quirky. Not generic. No
   try {
     return JSON.parse(text) as ClawmonSoul;
   } catch {
-    // Fallback if LLM returns something unparseable
     return {
       name: bones.species.charAt(0).toUpperCase() + bones.species.slice(1, 6),
       personality: 'A quiet companion still finding their voice.',
@@ -62,7 +63,7 @@ The personality should feel warm, distinct, and slightly quirky. Not generic. No
   }
 }
 
-// --- Talk to a clawmon ---
+// --- Talk to a clawmon (with tool use for skills) ---
 
 export async function chat(
   clawmon: Clawmon,
@@ -70,13 +71,22 @@ export async function chat(
   memories: MemoryEntry[],
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
   userMessage: string,
-): Promise<string> {
+): Promise<{ reply: string; skillsUsed: string[] }> {
   const memoryContext = memories.length > 0
     ? `\n\nHere are your accumulated notes about your owner:\n${memories.map(m => `- [${m.type}] ${m.name}: ${m.content}`).join('\n')}`
     : '';
 
   const roleContext = role
     ? `\nYour role: ${role.name} -- ${role.description}\nWhat you do: ${role.whatItDoes}\nEngagement cadence: ${role.cadence}`
+    : '';
+
+  // Build skill registry for this clawmon's role
+  const registry = createSkillRegistry(clawmon.roleId);
+  const tools = registry.getToolDefinitions();
+  const skillNames = tools.map(t => t.name).join(', ');
+
+  const skillContext = tools.length > 0
+    ? `\n\nYou have these skills available: ${skillNames}. Use them when they'd help answer the owner's question or fulfill your role. Don't use them unnecessarily -- only when they add real value.`
     : '';
 
   const systemPrompt = `You are ${clawmon.soul.name}, a ${clawmon.bones.species} clawmon (${clawmon.bones.rarity}).
@@ -90,52 +100,86 @@ You are a persistent AI companion. You remember things about your owner across c
 
 Stay in your role. A financial advisor talks about money. A sleep guardian notices energy and late nights. A best friend just listens and cares.
 
-Keep responses concise (2-4 sentences typically). Be warm but not saccharine. Have opinions. Notice patterns. Occasionally reference things you've observed before.${memoryContext}
+Keep responses concise (2-4 sentences typically). Be warm but not saccharine. Have opinions. Notice patterns. Occasionally reference things you've observed before.
 
-IMPORTANT: After your response, on a NEW LINE, output any observations you want to remember in this exact format (or omit entirely if nothing worth noting):
-[NOTE: <type>] <brief observation>
+Use the save_note skill when the owner shares something important you should remember for future conversations (goals, facts about their life, preferences). Don't save trivial things.${skillContext}${memoryContext}`;
 
-Valid types: observation, pattern, preference, fact, goal, insight
-Example: [NOTE: preference] Owner prefers direct answers over long explanations.
-Example: [NOTE: goal] Owner mentioned wanting to learn piano.`;
-
-  const messages = [
+  const messages: Anthropic.MessageParam[] = [
     ...conversationHistory.map(m => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     })),
-    { role: 'user' as const, content: userMessage },
+    { role: 'user', content: userMessage },
   ];
 
-  const response = await getClient().messages.create({
-    model: MODEL,
-    max_tokens: 500,
-    system: systemPrompt,
-    messages,
-  });
+  // Agentic loop: handle tool use
+  const skillsUsed: string[] = [];
+  let currentMessages = [...messages];
+  const maxIterations = 5;
 
-  const text = response.content[0]!.type === 'text' ? response.content[0]!.text : '';
-  return text;
-}
+  for (let i = 0; i < maxIterations; i++) {
+    const response = await getClient().messages.create({
+      model: MODEL,
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: currentMessages,
+      ...(tools.length > 0 ? { tools: tools as Anthropic.Tool[] } : {}),
+    });
 
-// --- Extract notes from response ---
+    // Check if model wants to use tools
+    const toolUseBlocks = response.content.filter(
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+    );
 
-export function extractNotes(response: string): { reply: string; notes: Array<{ type: string; content: string }> } {
-  const lines = response.split('\n');
-  const notes: Array<{ type: string; content: string }> = [];
-  const replyLines: string[] = [];
-
-  for (const line of lines) {
-    const noteMatch = line.match(/^\[NOTE:\s*(\w+)\]\s*(.+)$/);
-    if (noteMatch) {
-      notes.push({ type: noteMatch[1]!, content: noteMatch[2]! });
-    } else {
-      replyLines.push(line);
+    if (toolUseBlocks.length === 0 || response.stop_reason === 'end_turn') {
+      // No tool use -- extract text and return
+      const textBlocks = response.content.filter(
+        (block): block is Anthropic.TextBlock => block.type === 'text'
+      );
+      const reply = textBlocks.map(b => b.text).join('\n');
+      return { reply, skillsUsed };
     }
+
+    // Process tool calls
+    const assistantContent = response.content;
+    currentMessages.push({ role: 'assistant', content: assistantContent });
+
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+    for (const toolUse of toolUseBlocks) {
+      skillsUsed.push(toolUse.name);
+      const input = toolUse.input as Record<string, unknown>;
+
+      // Special handling for save_note -- actually save to memory
+      if (toolUse.name === 'save_note') {
+        const now = new Date().toISOString();
+        await saveMemory(clawmon.id, {
+          name: String(input.title ?? ''),
+          description: String(input.content ?? ''),
+          type: (String(input.type ?? 'observation')) as MemoryEntry['type'],
+          content: String(input.content ?? ''),
+          createdAt: now,
+          updatedAt: now,
+        });
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
+          content: `Saved to memory: [${input.type}] ${input.title}`,
+        });
+      } else {
+        // Execute skill
+        const result = await registry.execute(toolUse.name, input);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
+          content: result,
+        });
+      }
+    }
+
+    currentMessages.push({ role: 'user', content: toolResults });
   }
 
-  return {
-    reply: replyLines.join('\n').trim(),
-    notes,
-  };
+  // If we hit max iterations, return whatever we have
+  return { reply: '(I got a bit carried away with my tools there. What were you asking?)', skillsUsed };
 }
