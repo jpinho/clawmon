@@ -74,6 +74,9 @@ The personality should feel warm, distinct, and slightly quirky. Not generic. No
   }
 }
 
+// Callback for showing real-time skill activity
+export type OnSkillUse = (skillName: string, input: Record<string, unknown>) => void;
+
 // --- Talk to a clawmon (with tool use for skills) ---
 
 export async function chat(
@@ -82,6 +85,7 @@ export async function chat(
   memories: MemoryEntry[],
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
   userMessage: string,
+  onSkillUse?: OnSkillUse,
 ): Promise<{ reply: string; skillsUsed: string[] }> {
   const memoryContext = memories.length > 0
     ? `\n\nHere are your accumulated notes about your owner:\n${memories.map(m => `- [${m.type}] ${m.name}: ${m.content}`).join('\n')}`
@@ -103,17 +107,11 @@ export async function chat(
     ? `\n\nYou have these skills available: ${skillNames}. Use them when they'd help answer the owner's question or fulfill your role. Don't use them unnecessarily -- only when they add real value.`
     : '';
 
-  // Context: current date + timezone + locale
-  const now = new Date();
-  const dateStr = now.toISOString().split('T')[0];
-  const timeStr = now.toTimeString().split(' ')[0];
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const locale = Intl.DateTimeFormat().resolvedOptions().locale;
+  const ctx = getOwnerContext();
 
   const systemPrompt = `You are ${clawmon.soul.name}, a ${clawmon.bones.species} clawmon (${clawmon.bones.rarity}).
 
-Current date: ${dateStr} ${timeStr} (${tz})
-Locale: ${locale}
+${formatContextForPrompt(ctx)}
 
 Your personality: ${clawmon.soul.personality}
 Your voice: ${clawmon.soul.voice}
@@ -190,6 +188,7 @@ Use the save_note skill when the owner shares something important you should rem
       debug(`chat: tool_use name=${toolUse.name}, input=${JSON.stringify(toolUse.input)}`);
       skillsUsed.push(toolUse.name);
       const input = toolUse.input as Record<string, unknown>;
+      onSkillUse?.(toolUse.name, input);
 
       let result: string;
       try {

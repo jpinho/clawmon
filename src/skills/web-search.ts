@@ -1,4 +1,5 @@
 import type { Skill } from './types.js';
+import { debug } from '../debug.js';
 
 export const webSearchSkill: Skill = {
   name: 'web_search',
@@ -18,54 +19,81 @@ export const webSearchSkill: Skill = {
     const query = String(input.query ?? '');
     if (!query) return 'Error: No search query provided.';
 
+    debug(`web_search: query="${query}"`);
+
+    const apiKey = process.env.BRAVE_API_KEY;
+    if (!apiKey) {
+      debug('web_search: BRAVE_API_KEY not set');
+      return 'Error: BRAVE_API_KEY not set. Get a free key at https://brave.com/search/api/';
+    }
+
     try {
-      // Use DuckDuckGo instant answer API (no API key needed)
       const encoded = encodeURIComponent(query);
-      const response = await fetch(`https://api.duckduckgo.com/?q=${encoded}&format=json&no_html=1&skip_disambig=1`);
-      const data = await response.json() as {
-        Abstract?: string;
-        AbstractText?: string;
-        AbstractSource?: string;
-        AbstractURL?: string;
-        Answer?: string;
-        AnswerType?: string;
-        RelatedTopics?: Array<{ Text?: string; FirstURL?: string }>;
-      };
+      const response = await fetch(
+        `https://api.search.brave.com/res/v1/web/search?q=${encoded}&count=5`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Accept-Encoding': 'gzip',
+            'X-Subscription-Token': apiKey,
+          },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+
+      if (!response.ok) {
+        debug(`web_search: Brave API error: ${response.status} ${response.statusText}`);
+        return `Search error: ${response.status} ${response.statusText}`;
+      }
+
+      const data = await response.json() as BraveSearchResponse;
+      debug(`web_search: got ${data.web?.results?.length ?? 0} results`);
 
       const parts: string[] = [];
 
-      // Direct answer
-      if (data.Answer) {
-        parts.push(`Answer: ${data.Answer}`);
+      // Infobox (quick facts like exchange rates, definitions)
+      if (data.infobox?.results?.length) {
+        const info = data.infobox.results[0]!;
+        if (info.description) {
+          parts.push(`${info.title ?? 'Info'}: ${info.description}`);
+        }
       }
 
-      // Abstract
-      if (data.AbstractText) {
-        parts.push(`${data.AbstractText}`);
-        if (data.AbstractSource) parts.push(`Source: ${data.AbstractSource} (${data.AbstractURL})`);
-      }
-
-      // Related topics (top 5)
-      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
-        const topics = data.RelatedTopics
-          .filter((t): t is { Text: string; FirstURL: string } => !!t.Text)
-          .slice(0, 5);
-        if (topics.length > 0) {
-          parts.push('Related:');
-          for (const t of topics) {
-            parts.push(`- ${t.Text}`);
-          }
+      // Web results
+      if (data.web?.results?.length) {
+        for (const result of data.web.results.slice(0, 5)) {
+          const title = result.title ?? '';
+          const desc = result.description ?? '';
+          const url = result.url ?? '';
+          parts.push(`${title}\n  ${desc}\n  ${url}`);
         }
       }
 
       if (parts.length === 0) {
-        // DuckDuckGo didn't have a direct answer -- try a lite scrape
-        return `No instant answer found for "${query}". The query may require a more specific search engine or API. Try rephrasing.`;
+        return `No results found for "${query}".`;
       }
 
-      return parts.join('\n');
+      return `Search results for "${query}":\n\n${parts.join('\n\n')}`;
     } catch (err: any) {
+      debug(`web_search: error: ${err.message}`);
       return `Search error: ${err.message}`;
     }
   },
 };
+
+// Brave Search API response types (relevant subset)
+interface BraveSearchResponse {
+  web?: {
+    results?: Array<{
+      title?: string;
+      description?: string;
+      url?: string;
+    }>;
+  };
+  infobox?: {
+    results?: Array<{
+      title?: string;
+      description?: string;
+    }>;
+  };
+}
