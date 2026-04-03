@@ -18,6 +18,7 @@ import { talkToClawmon } from './talk.js';
 import { showClawmon } from './show.js';
 import { renderSprite } from './sprites/render.js';
 import { getRole, ROLES, formatRoleList } from './roles.js';
+import { listAvailableSkills, createSkillRegistry } from './skills/registry.js';
 
 const program = new Command();
 
@@ -232,6 +233,42 @@ program
     }
   });
 
+// --- skills ---
+
+program
+  .command('skills <name>')
+  .description('Show what skills a clawmon has')
+  .action(async (name: string) => {
+    if (!isInitialized()) {
+      console.log(chalk.red('  Not initialized. Run: clawmon init'));
+      return;
+    }
+
+    const clawmon = await findClawmonByName(name);
+    if (!clawmon) {
+      console.log(chalk.red(`  Clawmon "${name}" not found.`));
+      return;
+    }
+
+    const role = getRole(clawmon.roleId);
+    const registry = createSkillRegistry(clawmon.roleId);
+
+    console.log();
+    console.log(chalk.bold(`  ${clawmon.soul.name}'s Skills`));
+    if (role) console.log(chalk.dim(`  Role: ${role.name}`));
+    console.log();
+
+    for (const skill of registry.skills) {
+      console.log(`  ${chalk.cyan(skill.name)}`);
+      console.log(`  ${chalk.dim(skill.description)}`);
+      console.log();
+    }
+
+    if (registry.skills.length === 0) {
+      console.log(chalk.dim('  No skills yet.'));
+    }
+  });
+
 // --- export ---
 
 program
@@ -273,7 +310,7 @@ program
 
 const knownCommands = new Set([
   'init', 'hatch', 'talk', 'roles', 'show', 'notes',
-  'council', 'list', 'export', 'import', 'help',
+  'council', 'list', 'export', 'import', 'help', 'skills',
 ]);
 
 const args = process.argv.slice(2);
