@@ -101,6 +101,13 @@ export async function updateClawmon(clawmon: Clawmon): Promise<void> {
   await writeFile(join(dir, 'clawmon.json'), JSON.stringify(clawmon, null, 2));
 }
 
+// --- Find family members ---
+
+export async function listFamily(familyId: string): Promise<Clawmon[]> {
+  const all = await listClawmons();
+  return all.filter(c => c.familyId === familyId);
+}
+
 // --- Find clawmon by name (case-insensitive) ---
 
 export async function findClawmonByName(name: string): Promise<Clawmon | null> {
