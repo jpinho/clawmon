@@ -77,9 +77,28 @@ export interface Clawmon {
   id: string;
   bones: ClawmonBones;
   soul: ClawmonSoul;
-  roleId: string; // role from ROLES registry
+  roleId: string; // role from ROLES registry, or 'custom'
+  customRole?: CustomRole; // for prompt-based clawmons
+  familyId?: string; // groups clawmons spawned together
   hatchedAt: string; // ISO date
   interactions: number;
+}
+
+// --- Custom Roles (evolving, prompt-based) ---
+
+export interface CustomRole {
+  purpose: string;           // original user prompt: "support me going through a breakup"
+  currentRole: string;       // LLM-generated role name that evolves
+  currentDescription: string; // LLM-generated description that evolves
+  cadence: string;           // LLM-determined cadence
+  evolution: RoleEvolution[];  // history of how the role changed
+}
+
+export interface RoleEvolution {
+  date: string;
+  fromRole: string;
+  toRole: string;
+  reason: string; // why the role evolved
 }
 
 // --- Config ---

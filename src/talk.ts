@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import * as readline from 'node:readline';
 import type { Clawmon } from './types.js';
-import { chat } from './api.js';
+import { chat, evolveCustomRole } from './api.js';
 import { getRole } from './roles.js';
 import {
   loadMemories,
@@ -77,6 +77,20 @@ export async function talkToClawmon(clawmon: Clawmon, message: string): Promise<
   ]);
 
   clawmon.interactions += 1;
+
+  // Check for role evolution every 10 interactions (custom roles only)
+  if (clawmon.customRole && clawmon.interactions % 10 === 0) {
+    const freshMemories = await loadMemories(clawmon.id);
+    const evolved = await evolveCustomRole(clawmon, freshMemories);
+    if (evolved) {
+      clawmon.customRole = evolved;
+      const last = evolved.evolution[evolved.evolution.length - 1]!;
+      console.log(chalk.yellow(`  ${name} evolved: "${last.fromRole}" -> "${last.toRole}"`));
+      console.log(chalk.dim(`  Reason: ${last.reason}`));
+      console.log();
+    }
+  }
+
   await updateClawmon(clawmon);
 }
 

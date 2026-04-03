@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ClawmonBones, ClawmonSoul, Clawmon, MemoryEntry } from './types.js';
+import type { ClawmonBones, ClawmonSoul, Clawmon, MemoryEntry, CustomRole } from './types.js';
 import type { Role } from './roles.js';
 import { RARITY_STARS } from './types.js';
 import { createSkillRegistry } from './skills/registry.js';
@@ -78,6 +78,232 @@ The personality should feel warm, distinct, and slightly quirky. Not generic. No
   }
 }
 
+// --- Generate custom role from a user prompt ---
+
+export async function generateCustomRole(purpose: string): Promise<{ soul: ClawmonSoul; customRole: CustomRole; skills: string[] }> {
+  const prompt = `A user wants an AI companion for this purpose:
+
+"${purpose}"
+
+Generate the companion's identity. Respond with ONLY valid JSON:
+
+{
+  "name": "A short, memorable name (3-8 chars) that fits this purpose",
+  "personality": "One sentence personality description",
+  "catchphrase": "A short greeting that acknowledges their purpose",
+  "voice": "How they communicate",
+  "roleName": "A short role title (e.g. 'The Breakup Guide', 'The Job Search Ally', 'The Moving Planner')",
+  "roleDescription": "One sentence describing what this role does",
+  "cadence": "How often they should engage (e.g. 'Every session', 'Daily', 'Weekly')",
+  "skills": ["list of skill IDs from: calculator, web_search, date_time, save_note"]
+}
+
+The role should feel human and specific, not generic. The personality should be warm and suited to the purpose.`;
+
+  debug(`generateCustomRole: purpose="${purpose.slice(0, 80)}"`);
+
+  const response = await getClient().messages.create({
+    model: SOUL_MODEL,
+    max_tokens: 400,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const text = response.content[0]!.type === 'text' ? response.content[0]!.text : '';
+  debug(`generateCustomRole: raw=${text.slice(0, 200)}`);
+
+  try {
+    const parsed = JSON.parse(text) as {
+      name: string;
+      personality: string;
+      catchphrase: string;
+      voice: string;
+      roleName: string;
+      roleDescription: string;
+      cadence: string;
+      skills: string[];
+    };
+
+    const soul: ClawmonSoul = {
+      name: parsed.name,
+      personality: parsed.personality,
+      catchphrase: parsed.catchphrase,
+      voice: parsed.voice,
+    };
+
+    const customRole: CustomRole = {
+      purpose,
+      currentRole: parsed.roleName,
+      currentDescription: parsed.roleDescription,
+      cadence: parsed.cadence,
+      evolution: [],
+    };
+
+    return { soul, customRole, skills: parsed.skills ?? ['save_note', 'date_time'] };
+  } catch {
+    return {
+      soul: {
+        name: 'Guide',
+        personality: `A companion dedicated to: ${purpose.slice(0, 50)}`,
+        catchphrase: "I'm here for this. Let's work through it together.",
+        voice: 'Speaks with focus and warmth.',
+      },
+      customRole: {
+        purpose,
+        currentRole: 'The Guide',
+        currentDescription: purpose.slice(0, 100),
+        cadence: 'Every session',
+        evolution: [],
+      },
+      skills: ['save_note', 'date_time'],
+    };
+  }
+}
+
+// --- Evolve a custom role based on accumulated context ---
+
+export async function evolveCustomRole(clawmon: Clawmon, memories: MemoryEntry[]): Promise<CustomRole | null> {
+  if (!clawmon.customRole) return null;
+
+  const memSummary = memories.slice(-10).map(m => `- [${m.type}] ${m.content}`).join('\n');
+
+  const prompt = `You are reviewing a clawmon companion's role to see if it should evolve.
+
+Original purpose: "${clawmon.customRole.purpose}"
+Current role: "${clawmon.customRole.currentRole}" -- ${clawmon.customRole.currentDescription}
+Interactions so far: ${clawmon.interactions}
+
+Recent observations about the owner:
+${memSummary || '(none yet)'}
+
+Should this clawmon's role evolve? A role evolves when:
+- The owner's needs have shifted (e.g. they were grieving, now they're healing)
+- The original purpose is resolving and a new adjacent need emerges
+- The companion has learned enough to specialize further
+
+Respond with ONLY valid JSON:
+
+{
+  "shouldEvolve": true/false,
+  "newRole": "New role title (only if evolving)",
+  "newDescription": "New description (only if evolving)",
+  "reason": "Why the role is evolving (only if evolving)"
+}`;
+
+  debug(`evolveCustomRole: checking ${clawmon.soul.name}, interactions=${clawmon.interactions}`);
+
+  const response = await getClient().messages.create({
+    model: SOUL_MODEL,
+    max_tokens: 200,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const text = response.content[0]!.type === 'text' ? response.content[0]!.text : '';
+
+  try {
+    const parsed = JSON.parse(text) as {
+      shouldEvolve: boolean;
+      newRole?: string;
+      newDescription?: string;
+      reason?: string;
+    };
+
+    if (!parsed.shouldEvolve || !parsed.newRole) return null;
+
+    const evolved: CustomRole = {
+      ...clawmon.customRole,
+      currentRole: parsed.newRole,
+      currentDescription: parsed.newDescription ?? clawmon.customRole.currentDescription,
+      evolution: [
+        ...clawmon.customRole.evolution,
+        {
+          date: new Date().toISOString(),
+          fromRole: clawmon.customRole.currentRole,
+          toRole: parsed.newRole,
+          reason: parsed.reason ?? 'Natural evolution',
+        },
+      ],
+    };
+
+    debug(`evolveCustomRole: evolved "${clawmon.customRole.currentRole}" -> "${parsed.newRole}": ${parsed.reason}`);
+    return evolved;
+  } catch {
+    return null;
+  }
+}
+
+// --- Generate a family of clawmons from a single prompt ---
+
+export async function generateFamily(purpose: string, count: number): Promise<Array<{ soul: ClawmonSoul; customRole: CustomRole; skills: string[] }>> {
+  const capped = Math.min(count, 15);
+
+  const prompt = `A user wants a family of ${capped} AI companions for this overall purpose:
+
+"${purpose}"
+
+Design ${capped} distinct companions that together cover the full scope of this need. Each should have a unique angle -- don't make them all do the same thing. They should complement each other.
+
+Respond with ONLY a valid JSON array:
+
+[
+  {
+    "name": "Short name (3-8 chars)",
+    "personality": "One sentence personality",
+    "catchphrase": "Short greeting",
+    "voice": "How they communicate",
+    "roleName": "Role title",
+    "roleDescription": "What this specific companion handles",
+    "cadence": "Engagement frequency",
+    "skills": ["skill IDs from: calculator, web_search, date_time, save_note"]
+  }
+]
+
+Make each companion feel distinct in personality and purpose. They're a team, not clones.`;
+
+  debug(`generateFamily: purpose="${purpose.slice(0, 80)}", count=${capped}`);
+
+  const response = await getClient().messages.create({
+    model: SOUL_MODEL,
+    max_tokens: 2000,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const text = response.content[0]!.type === 'text' ? response.content[0]!.text : '';
+  debug(`generateFamily: raw response length=${text.length}`);
+
+  try {
+    const parsed = JSON.parse(text) as Array<{
+      name: string;
+      personality: string;
+      catchphrase: string;
+      voice: string;
+      roleName: string;
+      roleDescription: string;
+      cadence: string;
+      skills: string[];
+    }>;
+
+    return parsed.slice(0, capped).map(p => ({
+      soul: {
+        name: p.name,
+        personality: p.personality,
+        catchphrase: p.catchphrase,
+        voice: p.voice,
+      },
+      customRole: {
+        purpose,
+        currentRole: p.roleName,
+        currentDescription: p.roleDescription,
+        cadence: p.cadence,
+        evolution: [],
+      },
+      skills: p.skills ?? ['save_note', 'date_time'],
+    }));
+  } catch (err) {
+    debug(`generateFamily: parse failed: ${err}`);
+    return [];
+  }
+}
+
 // Callbacks for streaming and skill activity
 export type OnToken = (text: string) => void;
 export type OnSkillUse = (skillName: string, input: Record<string, unknown>) => void;
@@ -105,9 +331,18 @@ async function buildSystemPrompt(
     ? `\n\nHere are your accumulated notes about your owner:\n${memories.map(m => `- [${m.type}] ${m.name}: ${m.content}`).join('\n')}`
     : '';
 
-  const roleContext = role
-    ? `\nYour role: ${role.name} -- ${role.description}\nWhat you do: ${role.whatItDoes}\nEngagement cadence: ${role.cadence}`
-    : '';
+  // Role context from either preset role or custom role
+  let roleContext = '';
+  if (clawmon.customRole) {
+    const cr = clawmon.customRole;
+    roleContext = `\nYour role: ${cr.currentRole} -- ${cr.currentDescription}\nOriginal purpose: ${cr.purpose}\nEngagement cadence: ${cr.cadence}`;
+    if (cr.evolution.length > 0) {
+      const last = cr.evolution[cr.evolution.length - 1]!;
+      roleContext += `\nYour role recently evolved from "${last.fromRole}" because: ${last.reason}`;
+    }
+  } else if (role) {
+    roleContext = `\nYour role: ${role.name} -- ${role.description}\nWhat you do: ${role.whatItDoes}\nEngagement cadence: ${role.cadence}`;
+  }
 
   const skillContext = skillNames
     ? `\n\nYou have these skills available: ${skillNames}. Use them when they'd help answer the owner's question or fulfill your role. Don't use them unnecessarily -- only when they add real value.`
