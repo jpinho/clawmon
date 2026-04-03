@@ -1,0 +1,18 @@
+# Private design docs
+private-docs/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+
+# Clawmon local state (never commit user data)
+.clawmon/

@@ -1,0 +1,27 @@
+{
+  "name": "clawmon",
+  "version": "0.1.0",
+  "description": "Hatch AI companions that live in your terminal",
+  "type": "module",
+  "bin": {
+    "clawmon": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js"
+  },
+  "keywords": ["ai", "companion", "cli", "terminal", "claude"],
+  "author": "João Pinho",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "commander": "^13.1.0",
+    "chalk": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
