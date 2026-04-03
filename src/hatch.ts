@@ -16,6 +16,7 @@ import { type Role, ROLES, ROLE_CATEGORIES, getRolesByCategory, getRole } from '
 import { generateSoul } from './api.js';
 import { saveClawmon, listClawmons } from './memory/store.js';
 import { renderSprite } from './sprites/render.js';
+import { debug } from './debug.js';
 import chalk from 'chalk';
 
 // --- Mulberry32 PRNG (same as Claude Code's buddy system) ---
@@ -201,10 +202,16 @@ export async function hatchClawmon(userId: string, roleId: string, index: number
 
   // Generate soul via LLM
   console.log(chalk.dim('  Generating personality...'));
+  debug(`hatch: bones=${JSON.stringify(bones)}`);
+  debug(`hatch: role=${role.id} (${role.name})`);
   let soul: ClawmonSoul;
   try {
     soul = await generateSoul(bones, role);
   } catch (err: any) {
+    debug(`hatch: soul generation error: ${err.message}`);
+    debug(`hatch: error stack: ${err.stack}`);
+    if (err.status) debug(`hatch: HTTP status: ${err.status}`);
+    if (err.error) debug(`hatch: API error body: ${JSON.stringify(err.error)}`);
     if (err.message?.includes('authentication') || err.message?.includes('apiKey') || err.message?.includes('API')) {
       console.log(chalk.yellow('  No API key found. Using generated fallback personality.'));
       console.log(chalk.dim('  Set ANTHROPIC_API_KEY for LLM-generated personalities.'));

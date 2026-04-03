@@ -19,13 +19,31 @@ import { showClawmon } from './show.js';
 import { renderSprite } from './sprites/render.js';
 import { getRole, ROLES, formatRoleList } from './roles.js';
 import { listAvailableSkills, createSkillRegistry } from './skills/registry.js';
+import { debug as dbg } from './debug.js';
 
 const program = new Command();
+
+// Global debug flag
+export let DEBUG = false;
+
+export function debug(...args: unknown[]): void {
+  if (DEBUG) console.log(chalk.gray(`  [debug]`), ...args);
+}
 
 program
   .name('clawmon')
   .description('Hatch AI companions that live in your terminal')
-  .version('0.1.0');
+  .version('0.1.0')
+  .option('--debug', 'Show verbose debug output')
+  .hook('preAction', (thisCommand) => {
+    if (thisCommand.opts().debug) {
+      DEBUG = true;
+      debug('Debug mode enabled');
+      debug(`API key: ${process.env.ANTHROPIC_API_KEY ? 'set (' + process.env.ANTHROPIC_API_KEY.slice(0, 12) + '...)' : 'NOT SET'}`);
+      debug(`Home: ${process.env.HOME}`);
+      debug(`Node: ${process.version}`);
+    }
+  });
 
 // --- init ---
 
@@ -303,31 +321,35 @@ program
     console.log(chalk.green(`  Imported ${clawmon.soul.name}!`));
   });
 
-// --- Default: natural language with @mentions ---
-// If the input isn't a known command, treat it as a message.
-// @milo how's my budget? → routes to Milo
-// Just typing without @mention → routes to last-active or first clawmon
+// --- Routing: known command vs natural language ---
 
 const knownCommands = new Set([
   'init', 'hatch', 'talk', 'roles', 'show', 'notes',
   'council', 'list', 'export', 'import', 'help', 'skills',
+  '-V', '--version', '-h', '--help',
 ]);
 
-const args = process.argv.slice(2);
-const firstArg = args[0]?.replace(/^-.*/, ''); // ignore flags
+const rawArgs = process.argv.slice(2);
+const nonFlagArgs = rawArgs.filter(a => !a.startsWith('-'));
+const firstNonFlag = nonFlagArgs[0];
+const isNaturalLanguage = nonFlagArgs.length > 0 && firstNonFlag && !knownCommands.has(firstNonFlag);
 
-if (args.length > 0 && firstArg && !knownCommands.has(firstArg) && !firstArg.startsWith('-')) {
-  // Not a known command -- treat the whole thing as a message
+if (rawArgs.includes('--debug')) DEBUG = true;
+
+if (isNaturalLanguage) {
+  // Natural language -- treat the whole thing as a message to a clawmon
   (async () => {
     if (!isInitialized()) {
       console.log(chalk.red('  Not initialized. Run: clawmon init'));
       process.exit(1);
     }
 
-    const fullMessage = args.join(' ');
+    const fullMessage = rawArgs.filter(a => a !== '--debug').join(' ');
+    dbg(`Natural language input: "${fullMessage}"`);
 
     // Check for @mention
     const mentionMatch = fullMessage.match(/@(\w+)/);
+    dbg(`Mention match: ${mentionMatch ? mentionMatch[1] : 'none'}`);
     let clawmon;
 
     if (mentionMatch) {
@@ -352,7 +374,7 @@ if (args.length > 0 && firstArg && !knownCommands.has(firstArg) && !firstArg.sta
       console.log(chalk.dim(`  (routing to ${clawmon.soul.name})`));
     }
 
-    // Strip the @mention from the message
+    // Strip the @mention and clean up the message
     const cleanMessage = fullMessage.replace(/@\w+\s*/, '').trim() || 'Hey!';
     await talkToClawmon(clawmon, cleanMessage);
   })();
