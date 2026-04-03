@@ -6,6 +6,10 @@ import { createSkillRegistry } from './skills/registry.js';
 import { saveMemory } from './memory/store.js';
 import { debug } from './debug.js';
 import { getOwnerContext, formatContextForPrompt } from './context.js';
+import { loadOwnerProfile, formatOwnerContext } from './claude-context.js';
+
+// Cache owner profile per process (doesn't change during a session)
+let ownerContextCache: string | null = null;
 
 let client: Anthropic | null = null;
 
@@ -18,7 +22,8 @@ function getClient(): Anthropic {
   return client;
 }
 
-const MODEL = 'claude-sonnet-4-20250514';
+const CHAT_MODEL = 'claude-opus-4-6';
+const SOUL_MODEL = 'claude-sonnet-4-20250514'; // Sonnet is fine for soul generation
 
 // --- Generate soul on hatch ---
 
@@ -47,11 +52,10 @@ Generate a personality for this companion that fits their role. Respond with ONL
 
 The personality should feel warm, distinct, and slightly quirky. Not generic. Not corporate. Like a character from a Ghibli film. Their role should flavor everything but not make them robotic.`;
 
-  debug(`generateSoul: model=${MODEL}, species=${bones.species}, role=${role.id}`);
-  debug(`generateSoul: prompt length=${prompt.length} chars`);
+  debug(`generateSoul: model=${SOUL_MODEL}, species=${bones.species}, role=${role.id}`);
 
   const response = await getClient().messages.create({
-    model: MODEL,
+    model: SOUL_MODEL,
     max_tokens: 300,
     messages: [{ role: 'user', content: prompt }],
   });
@@ -74,19 +78,29 @@ The personality should feel warm, distinct, and slightly quirky. Not generic. No
   }
 }
 
-// Callback for showing real-time skill activity
+// Callbacks for streaming and skill activity
+export type OnToken = (text: string) => void;
 export type OnSkillUse = (skillName: string, input: Record<string, unknown>) => void;
 
-// --- Talk to a clawmon (with tool use for skills) ---
+// --- Build system prompt ---
 
-export async function chat(
+async function buildSystemPrompt(
   clawmon: Clawmon,
   role: Role | undefined,
   memories: MemoryEntry[],
-  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
-  userMessage: string,
-  onSkillUse?: OnSkillUse,
-): Promise<{ reply: string; skillsUsed: string[] }> {
+  skillNames: string,
+): Promise<string> {
+  // Load owner context from Claude Code memories (cached per process)
+  if (ownerContextCache === null) {
+    try {
+      const profile = await loadOwnerProfile();
+      ownerContextCache = formatOwnerContext(profile);
+      debug(`buildSystemPrompt: loaded owner context (${ownerContextCache.length} chars)`);
+    } catch (err) {
+      debug(`buildSystemPrompt: failed to load owner context: ${err}`);
+      ownerContextCache = '';
+    }
+  }
   const memoryContext = memories.length > 0
     ? `\n\nHere are your accumulated notes about your owner:\n${memories.map(m => `- [${m.type}] ${m.name}: ${m.content}`).join('\n')}`
     : '';
@@ -95,21 +109,13 @@ export async function chat(
     ? `\nYour role: ${role.name} -- ${role.description}\nWhat you do: ${role.whatItDoes}\nEngagement cadence: ${role.cadence}`
     : '';
 
-  // Build skill registry for this clawmon's role
-  const registry = createSkillRegistry(clawmon.roleId);
-  const tools = registry.getToolDefinitions();
-  const skillNames = tools.map(t => t.name).join(', ');
-
-  debug(`chat: clawmon=${clawmon.soul.name}, role=${clawmon.roleId}, skills=[${skillNames}]`);
-  debug(`chat: memories=${memories.length}, history=${conversationHistory.length} messages`);
-
-  const skillContext = tools.length > 0
+  const skillContext = skillNames
     ? `\n\nYou have these skills available: ${skillNames}. Use them when they'd help answer the owner's question or fulfill your role. Don't use them unnecessarily -- only when they add real value.`
     : '';
 
   const ctx = getOwnerContext();
 
-  const systemPrompt = `You are ${clawmon.soul.name}, a ${clawmon.bones.species} clawmon (${clawmon.bones.rarity}).
+  return `You are ${clawmon.soul.name}, a ${clawmon.bones.species} clawmon (${clawmon.bones.rarity}).
 
 ${formatContextForPrompt(ctx)}
 
@@ -124,9 +130,28 @@ Stay in your role. A financial advisor talks about money. A sleep guardian notic
 
 Keep responses concise (2-4 sentences typically). Be warm but not saccharine. Have opinions. Notice patterns. Occasionally reference things you've observed before.
 
-Use the save_note skill when the owner shares something important you should remember for future conversations (goals, facts about their life, preferences). Don't save trivial things.${skillContext}${memoryContext}`;
+Use the save_note skill when the owner shares something important you should remember for future conversations (goals, facts about their life, preferences). Don't save trivial things.${skillContext}${ownerContextCache}${memoryContext}`;
+}
 
-  debug(`chat: system prompt length=${systemPrompt.length} chars`);
+// --- Talk to a clawmon with streaming + tool use ---
+
+export async function chat(
+  clawmon: Clawmon,
+  role: Role | undefined,
+  memories: MemoryEntry[],
+  conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>,
+  userMessage: string,
+  onToken?: OnToken,
+  onSkillUse?: OnSkillUse,
+): Promise<{ reply: string; skillsUsed: string[] }> {
+  const registry = createSkillRegistry(clawmon.roleId);
+  const tools = registry.getToolDefinitions();
+  const skillNames = tools.map(t => t.name).join(', ');
+
+  debug(`chat: clawmon=${clawmon.soul.name}, model=${CHAT_MODEL}, role=${clawmon.roleId}, skills=[${skillNames}]`);
+  debug(`chat: memories=${memories.length}, history=${conversationHistory.length} messages`);
+
+  const systemPrompt = await buildSystemPrompt(clawmon, role, memories, skillNames);
 
   const messages: Anthropic.MessageParam[] = [
     ...conversationHistory.map(m => ({
@@ -136,9 +161,6 @@ Use the save_note skill when the owner shares something important you should rem
     { role: 'user', content: userMessage },
   ];
 
-  debug(`chat: sending ${messages.length} messages, tools=${tools.length}`);
-
-  // Agentic loop: handle tool use
   const skillsUsed: string[] = [];
   let currentMessages = [...messages];
   const maxIterations = 5;
@@ -146,81 +168,91 @@ Use the save_note skill when the owner shares something important you should rem
   for (let i = 0; i < maxIterations; i++) {
     debug(`chat: iteration ${i + 1}/${maxIterations}`);
 
-    let response: Anthropic.Message;
+    // Check if this is the final iteration (no tools) or a tool-use iteration
+    // Stream on the final text response, use non-streaming for tool iterations
+    const isToolIteration = i > 0; // after first round, we're likely handling tool results
+
     try {
-      response = await getClient().messages.create({
-        model: MODEL,
+      const stream = getClient().messages.stream({
+        model: CHAT_MODEL,
         max_tokens: 1000,
         system: systemPrompt,
         messages: currentMessages,
         ...(tools.length > 0 ? { tools: tools as Anthropic.Tool[] } : {}),
       });
+
+      // Stream text tokens as they arrive
+      stream.on('text', (textDelta) => {
+        onToken?.(textDelta);
+      });
+
+      const finalMessage = await stream.finalMessage();
+      const stopReason = finalMessage.stop_reason ?? '';
+
+      debug(`chat: stop_reason=${stopReason}, blocks=${finalMessage.content.length}, usage=${JSON.stringify(finalMessage.usage)}`);
+
+      // Check for tool use
+      const toolUseBlocks = finalMessage.content.filter(
+        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+      );
+
+      if (toolUseBlocks.length === 0 || stopReason === 'end_turn') {
+        // No tool use -- return streamed text
+        const textBlocks = finalMessage.content.filter(
+          (block): block is Anthropic.TextBlock => block.type === 'text'
+        );
+        const reply = textBlocks.map(b => b.text).join('\n');
+        debug(`chat: final reply length=${reply.length} chars, skills used=[${skillsUsed.join(', ')}]`);
+        return { reply, skillsUsed };
+      }
+
+      // Process tool calls
+      currentMessages.push({ role: 'assistant', content: finalMessage.content });
+
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+
+      for (const toolUse of toolUseBlocks) {
+        debug(`chat: tool_use name=${toolUse.name}, input=${JSON.stringify(toolUse.input)}`);
+        skillsUsed.push(toolUse.name);
+        const input = toolUse.input as Record<string, unknown>;
+        onSkillUse?.(toolUse.name, input);
+
+        let result: string;
+        try {
+          if (toolUse.name === 'save_note') {
+            const now = new Date().toISOString();
+            await saveMemory(clawmon.id, {
+              name: String(input.title ?? ''),
+              description: String(input.content ?? ''),
+              type: (String(input.type ?? 'observation')) as MemoryEntry['type'],
+              content: String(input.content ?? ''),
+              createdAt: now,
+              updatedAt: now,
+            });
+            result = `Saved to memory: [${input.type}] ${input.title}`;
+          } else {
+            result = await registry.execute(toolUse.name, input);
+          }
+        } catch (err: any) {
+          debug(`chat: skill error: ${toolUse.name}: ${err.message}`);
+          result = `Error executing ${toolUse.name}: ${err.message}`;
+        }
+
+        debug(`chat: tool_result name=${toolUse.name}, result=${result.slice(0, 200)}`);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
+          content: result,
+        });
+      }
+
+      currentMessages.push({ role: 'user', content: toolResults });
+
     } catch (err: any) {
       debug(`chat: API error: ${err.message}`);
       debug(`chat: error details: ${JSON.stringify(err.error ?? err, null, 2)}`);
       throw err;
     }
-
-    debug(`chat: stop_reason=${response.stop_reason}, blocks=${response.content.length}, usage=${JSON.stringify(response.usage)}`);
-
-    // Check if model wants to use tools
-    const toolUseBlocks = response.content.filter(
-      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
-    );
-
-    if (toolUseBlocks.length === 0 || response.stop_reason === 'end_turn') {
-      // No tool use -- extract text and return
-      const textBlocks = response.content.filter(
-        (block): block is Anthropic.TextBlock => block.type === 'text'
-      );
-      const reply = textBlocks.map(b => b.text).join('\n');
-      debug(`chat: final reply length=${reply.length} chars, skills used=[${skillsUsed.join(', ')}]`);
-      return { reply, skillsUsed };
-    }
-
-    // Process tool calls
-    const assistantContent = response.content;
-    currentMessages.push({ role: 'assistant', content: assistantContent });
-
-    const toolResults: Anthropic.ToolResultBlockParam[] = [];
-
-    for (const toolUse of toolUseBlocks) {
-      debug(`chat: tool_use name=${toolUse.name}, input=${JSON.stringify(toolUse.input)}`);
-      skillsUsed.push(toolUse.name);
-      const input = toolUse.input as Record<string, unknown>;
-      onSkillUse?.(toolUse.name, input);
-
-      let result: string;
-      try {
-        // Special handling for save_note -- actually save to memory
-        if (toolUse.name === 'save_note') {
-          const now = new Date().toISOString();
-          await saveMemory(clawmon.id, {
-            name: String(input.title ?? ''),
-            description: String(input.content ?? ''),
-            type: (String(input.type ?? 'observation')) as MemoryEntry['type'],
-            content: String(input.content ?? ''),
-            createdAt: now,
-            updatedAt: now,
-          });
-          result = `Saved to memory: [${input.type}] ${input.title}`;
-        } else {
-          result = await registry.execute(toolUse.name, input);
-        }
-      } catch (err: any) {
-        debug(`chat: skill error: ${toolUse.name}: ${err.message}`);
-        result = `Error executing ${toolUse.name}: ${err.message}`;
-      }
-
-      debug(`chat: tool_result name=${toolUse.name}, result=${result.slice(0, 200)}`);
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: toolUse.id,
-        content: result,
-      });
-    }
-
-    currentMessages.push({ role: 'user', content: toolResults });
   }
 
   debug('chat: hit max iterations');

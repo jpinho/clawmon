@@ -5,67 +5,95 @@ import { getRole } from './roles.js';
 import { renderSprite } from './sprites/render.js';
 import { loadMemories } from './memory/store.js';
 
+const RARITY_COLOR: Record<string, (s: string) => string> = {
+  common: chalk.white,
+  uncommon: chalk.green,
+  rare: chalk.cyan,
+  epic: chalk.magenta,
+  legendary: chalk.yellow,
+};
+
+function statBar(value: number, width: number = 20): string {
+  const filled = Math.round((value / 100) * width);
+  const bar = '█'.repeat(filled) + '░'.repeat(width - filled);
+  return bar;
+}
+
 export async function showClawmon(clawmon: Clawmon): Promise<void> {
   const sprite = renderSprite(clawmon.bones);
   const memories = await loadMemories(clawmon.id);
   const rarity = clawmon.bones.rarity;
   const role = getRole(clawmon.roleId);
-
-  const rarityColor = rarity === 'legendary' ? chalk.yellow
-    : rarity === 'epic' ? chalk.magenta
-    : rarity === 'rare' ? chalk.cyan
-    : rarity === 'uncommon' ? chalk.green
-    : chalk.white;
-
-  const boxWidth = 42;
-  const hr = '─'.repeat(boxWidth);
+  const colorFn = RARITY_COLOR[rarity] ?? chalk.white;
 
   console.log();
-  console.log(`  ┌${hr}┐`);
-  console.log(`  │ ${chalk.bold.white(clawmon.soul.name)}${' '.repeat(boxWidth - clawmon.soul.name.length - 1)}│`);
-  console.log(`  │ Species: ${clawmon.bones.species} ${rarityColor(`(${rarity})`)}${' '.repeat(Math.max(0, boxWidth - 12 - clawmon.bones.species.length - rarity.length - 3))}│`);
+
+  // Top line: rarity stars + species (right-aligned)
+  const stars = RARITY_STARS[rarity];
+  const rarityLabel = `${stars}  ${rarity.toUpperCase()}`;
+  const speciesLabel = clawmon.bones.species.toUpperCase();
+  const topPad = Math.max(0, 36 - rarityLabel.length - speciesLabel.length);
+  console.log(`  ${colorFn(rarityLabel)}${' '.repeat(topPad)}${chalk.dim(speciesLabel)}`);
+
   if (clawmon.bones.shiny) {
-    console.log(`  │ ${chalk.yellow('✨ SHINY')}${' '.repeat(boxWidth - 9)}│`);
+    console.log(chalk.yellow(`  ✨ SHINY`));
   }
-  console.log(`  │ ${RARITY_STARS[rarity]}${' '.repeat(boxWidth - RARITY_STARS[rarity].length - 1)}│`);
-  if (role) {
-    const roleLine = `Role: ${role.name}`;
-    console.log(`  │ ${chalk.cyan(roleLine)}${' '.repeat(Math.max(0, boxWidth - roleLine.length - 1))}│`);
-  }
-  console.log(`  │${' '.repeat(boxWidth)}│`);
 
-  // Sprite
+  console.log();
+
+  // Sprite centered
   for (const line of sprite) {
-    const padding = Math.max(0, boxWidth - line.length);
-    console.log(`  │ ${line}${' '.repeat(padding - 1)}│`);
+    console.log(`  ${chalk.green(line)}`);
   }
 
-  console.log(`  │${' '.repeat(boxWidth)}│`);
+  console.log();
 
-  // Stats
+  // Name bold
+  console.log(`  ${chalk.bold.white(clawmon.soul.name)}`);
+
+  // Role
+  if (role) {
+    console.log(`  ${chalk.cyan(role.name)}`);
+  }
+
+  console.log();
+
+  // Personality in quotes
+  const wrapped = wrapText(clawmon.soul.personality, 34);
+  console.log(chalk.dim(`  "${wrapped[0]}`));
+  for (let i = 1; i < wrapped.length; i++) {
+    const suffix = i === wrapped.length - 1 ? '"' : '';
+    console.log(chalk.dim(`   ${wrapped[i]}${suffix}`));
+  }
+  if (wrapped.length === 1) {
+    // Close quote was on first line -- rewrite
+    process.stdout.write('\x1b[1A'); // move up
+    console.log(chalk.dim(`  "${wrapped[0]}"`));
+  }
+
+  console.log();
+
+  // Stats with bars
   const stats = clawmon.bones.stats;
-  const statLine1 = `INSIGHT ${stats.INSIGHT} | CREATIVITY ${stats.CREATIVITY}`;
-  const statLine2 = `FOCUS ${stats.FOCUS} | EMPATHY ${stats.EMPATHY} | WIT ${stats.WIT}`;
-  console.log(`  │ ${chalk.dim(statLine1)}${' '.repeat(Math.max(0, boxWidth - statLine1.length - 1))}│`);
-  console.log(`  │ ${chalk.dim(statLine2)}${' '.repeat(Math.max(0, boxWidth - statLine2.length - 1))}│`);
+  const statEntries: [string, number][] = [
+    ['INSIGHT', stats.INSIGHT],
+    ['CREATIVITY', stats.CREATIVITY],
+    ['FOCUS', stats.FOCUS],
+    ['EMPATHY', stats.EMPATHY],
+    ['WIT', stats.WIT],
+  ];
 
-  console.log(`  │${' '.repeat(boxWidth)}│`);
-
-  // Personality
-  const personality = clawmon.soul.personality;
-  const wrapped = wrapText(personality, boxWidth - 2);
-  for (const line of wrapped) {
-    console.log(`  │ ${chalk.italic(line)}${' '.repeat(Math.max(0, boxWidth - line.length - 1))}│`);
+  for (const [name, value] of statEntries) {
+    const label = name.padEnd(12);
+    const bar = statBar(value);
+    const num = String(value).padStart(4);
+    console.log(`  ${chalk.dim(label)}${chalk.green(bar)}${chalk.white(num)}`);
   }
 
-  console.log(`  │${' '.repeat(boxWidth)}│`);
+  console.log();
 
-  // Memory count & interactions
-  console.log(`  │ Notes: ${memories.length} collected${' '.repeat(Math.max(0, boxWidth - 10 - String(memories.length).length - 10))}│`);
-  console.log(`  │ Interactions: ${clawmon.interactions}${' '.repeat(Math.max(0, boxWidth - 16 - String(clawmon.interactions).length))}│`);
-  console.log(`  │ Hatched: ${clawmon.hatchedAt.split('T')[0]}${' '.repeat(Math.max(0, boxWidth - 11 - 10))}│`);
-
-  console.log(`  └${hr}┘`);
+  // Footer: notes + interactions
+  console.log(chalk.dim(`  Notes: ${memories.length}  |  Interactions: ${clawmon.interactions}  |  Hatched: ${clawmon.hatchedAt.split('T')[0]}`));
   console.log();
 }
 
