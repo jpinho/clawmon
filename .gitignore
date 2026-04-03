@@ -1,6 +1,9 @@
 # Private design docs
 private-docs/
 
+# Local launcher scripts (contain account-specific secrets config)
+bin/
+
 # Dependencies
 node_modules/
 

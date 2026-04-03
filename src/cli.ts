@@ -14,7 +14,7 @@ import {
   importClawmon,
 } from './memory/store.js';
 import { hatchClawmon, suggestRoles, displayRoleSuggestions } from './hatch.js';
-import { talkToClawmon } from './talk.js';
+import { talkToClawmon, replWithClawmon } from './talk.js';
 import { showClawmon } from './show.js';
 import { renderSprite } from './sprites/render.js';
 import { getRole, ROLES, formatRoleList } from './roles.js';
@@ -147,6 +147,40 @@ program
 
     const message = messageParts.join(' ');
     await talkToClawmon(clawmon, message);
+  });
+
+// --- chat (REPL) ---
+
+program
+  .command('chat [name]')
+  .description('Open a conversation with a clawmon (interactive REPL)')
+  .action(async (name?: string) => {
+    if (!isInitialized()) {
+      console.log(chalk.red('  Not initialized. Run: clawmon init'));
+      return;
+    }
+
+    let clawmon;
+    if (name) {
+      clawmon = await findClawmonByName(name);
+      if (!clawmon) {
+        console.log(chalk.red(`  Clawmon "${name}" not found.`));
+        const all = await listClawmons();
+        if (all.length > 0) {
+          console.log(chalk.dim(`  Available: ${all.map(c => c.soul.name).join(', ')}`));
+        }
+        return;
+      }
+    } else {
+      const all = await listClawmons();
+      if (all.length === 0) {
+        console.log(chalk.dim('  No clawmons yet. Run: clawmon hatch'));
+        return;
+      }
+      clawmon = all[0]!;
+    }
+
+    await replWithClawmon(clawmon);
   });
 
 // --- show ---
@@ -324,7 +358,7 @@ program
 // --- Routing: known command vs natural language ---
 
 const knownCommands = new Set([
-  'init', 'hatch', 'talk', 'roles', 'show', 'notes',
+  'init', 'hatch', 'talk', 'chat', 'roles', 'show', 'notes',
   'council', 'list', 'export', 'import', 'help', 'skills',
   '-V', '--version', '-h', '--help',
 ]);

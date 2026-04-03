@@ -9,15 +9,23 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/cli.ts",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "mcp": "npx tsx src/mcp/server.ts"
   },
-  "keywords": ["ai", "companion", "cli", "terminal", "claude"],
+  "keywords": [
+    "ai",
+    "companion",
+    "cli",
+    "terminal",
+    "claude"
+  ],
   "author": "João Pinho",
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "commander": "^13.1.0",
-    "chalk": "^5.4.1"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",
