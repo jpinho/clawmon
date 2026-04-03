@@ -254,23 +254,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const FALLBACK_NAMES: Partial<Record<Species, string>> = {
-  compilox: 'Compi', buggnaw: 'Nibbles', deplorix: 'Rocket', kubrik: 'Kubos',
-  hashling: 'Cipher', querrix: 'Query', fernox: 'Fernie', glacielle: 'Frost',
-  pyroclaw: 'Ember', tideling: 'Ripple', galecrest: 'Breeze', terravox: 'Rumble',
-  musinox: 'Musa', spectrox: 'Shade', chronark: 'Tempo', voidling: 'Void',
-  paradawn: 'Paradox', infinik: 'Infi', drakemaw: 'Drake', ashphoenix: 'Ashe',
-  umbrawl: 'Umbra', stellix: 'Stella', levianthan: 'Levia', mythora: 'Mytha',
-  termikitty: 'Kitti', capybrix: 'Capy', owlette: 'Hoot', penguink: 'Waddle',
-  snailore: 'Spiral', foxember: 'Foxie',
-};
+// Nickname pools -- warm, personal names. Not role labels.
+// Multiple per species so hatching index can pick different ones.
+const NICKNAME_POOL: string[] = [
+  'Pip', 'Nix', 'Rue', 'Bex', 'Kai', 'Fen', 'Lux', 'Ora', 'Zel', 'Tavi',
+  'Juno', 'Milo', 'Sage', 'Wren', 'Cleo', 'Arlo', 'Fern', 'Rune', 'Dusk', 'Vale',
+  'Maple', 'Basil', 'Echo', 'Hazel', 'Moss', 'Olive', 'Plum', 'Reed', 'Sol', 'Ash',
+  'Birch', 'Cedar', 'Dew', 'Ember', 'Flint', 'Gale', 'Ivy', 'Jade', 'Kit', 'Lark',
+  'Mist', 'Nova', 'Oak', 'Pearl', 'Quinn', 'Rowan', 'Skye', 'Thorn', 'Umber', 'Vex',
+  'Willow', 'Zephyr', 'Brin', 'Coral', 'Drift', 'Elara', 'Frost', 'Glow', 'Haze', 'Indigo',
+];
 
 function fallbackSoul(bones: ClawmonBones, role: Role): ClawmonSoul {
-  const name = FALLBACK_NAMES[bones.species] ?? bones.species.charAt(0).toUpperCase() + bones.species.slice(1, 6);
+  // Pick a nickname deterministically from the pool based on species + role
+  const hash = hashString(bones.species + role.id);
+  const name = NICKNAME_POOL[hash % NICKNAME_POOL.length]!;
+  const roleName = role.name.replace(/^The /, '');
   return {
     name,
-    personality: `A ${bones.rarity} ${bones.species} ready to be your ${role.name}. Quiet but observant, eager to help.`,
-    catchphrase: `Hello! I'm ${name}, your ${role.name}. Let's get to know each other.`,
-    voice: `Speaks in a way that suits ${role.name} -- warm, attentive, ${role.category === 'wild' ? 'unpredictable' : 'reliable'}.`,
+    personality: `A curious ${bones.species} with a knack for ${roleName.toLowerCase()} things. Still finding their voice, but already paying attention.`,
+    catchphrase: `Hey! I'm ${name}. I'll be keeping an eye on things for you.`,
+    voice: `Speaks warmly and personally, like a friend who happens to be great at ${roleName.toLowerCase()} stuff.`,
   };
 }
