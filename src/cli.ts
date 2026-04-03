@@ -105,11 +105,11 @@ program
     }
   });
 
-// --- talk ---
+// --- talk (explicit) ---
 
 program
   .command('talk <name> <message...>')
-  .description('Talk to your clawmon')
+  .description('Talk to a specific clawmon')
   .action(async (name: string, messageParts: string[]) => {
     if (!isInitialized()) {
       console.log(chalk.red('  Not initialized. Run: clawmon init'));
@@ -266,4 +266,59 @@ program
     console.log(chalk.green(`  Imported ${clawmon.soul.name}!`));
   });
 
-program.parse();
+// --- Default: natural language with @mentions ---
+// If the input isn't a known command, treat it as a message.
+// @milo how's my budget? → routes to Milo
+// Just typing without @mention → routes to last-active or first clawmon
+
+const knownCommands = new Set([
+  'init', 'hatch', 'talk', 'roles', 'show', 'notes',
+  'council', 'list', 'export', 'import', 'help',
+]);
+
+const args = process.argv.slice(2);
+const firstArg = args[0]?.replace(/^-.*/, ''); // ignore flags
+
+if (args.length > 0 && firstArg && !knownCommands.has(firstArg) && !firstArg.startsWith('-')) {
+  // Not a known command -- treat the whole thing as a message
+  (async () => {
+    if (!isInitialized()) {
+      console.log(chalk.red('  Not initialized. Run: clawmon init'));
+      process.exit(1);
+    }
+
+    const fullMessage = args.join(' ');
+
+    // Check for @mention
+    const mentionMatch = fullMessage.match(/@(\w+)/);
+    let clawmon;
+
+    if (mentionMatch) {
+      const mentionName = mentionMatch[1]!;
+      clawmon = await findClawmonByName(mentionName);
+      if (!clawmon) {
+        console.log(chalk.red(`  Clawmon "${mentionName}" not found.`));
+        const all = await listClawmons();
+        if (all.length > 0) {
+          console.log(chalk.dim(`  Available: ${all.map(c => '@' + c.soul.name.toLowerCase()).join(', ')}`));
+        }
+        process.exit(1);
+      }
+    } else {
+      // No @mention -- route to first clawmon
+      const all = await listClawmons();
+      if (all.length === 0) {
+        console.log(chalk.dim('  No clawmons yet. Run: clawmon hatch'));
+        process.exit(1);
+      }
+      clawmon = all[0]!;
+      console.log(chalk.dim(`  (routing to ${clawmon.soul.name})`));
+    }
+
+    // Strip the @mention from the message
+    const cleanMessage = fullMessage.replace(/@\w+\s*/, '').trim() || 'Hey!';
+    await talkToClawmon(clawmon, cleanMessage);
+  })();
+} else {
+  program.parse();
+}
