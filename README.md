@@ -25,7 +25,7 @@ They're not chatbots. They're persistent creatures with memory, character, and p
 ## Quick Start
 
 ```bash
-cd ~/meta/clawmon
+cd ~/clawmon
 op run --env-file .env.op --account <your-op-account> -- npx tsx src/index.ts hatch
 ```
 
@@ -176,9 +176,9 @@ clawmon import penny.json               # import from JSON
 clawmon --debug "@penny hello"          # verbose output for troubleshooting
 ```
 
-## Claude Code Integration (MCP)
+## MCP Integration
 
-Clawmon runs as an MCP server inside Claude Code. Talk to your clawmons directly in your Claude session:
+Clawmon runs as an MCP server. Talk to your clawmons directly in any MCP-compatible host:
 
 > "Talk to Penny about my budget"
 > "Show me Penny's card"
@@ -188,7 +188,7 @@ Clawmon runs as an MCP server inside Claude Code. Talk to your clawmons directly
 Setup:
 
 ```bash
-claude mcp add clawmon -- bash ~/meta/clawmon/bin/clawmon-mcp.sh
+claude mcp add clawmon -- bash ~/clawmon/bin/clawmon-mcp.sh
 ```
 
 ## Roles
@@ -240,18 +240,22 @@ npx tsx src/index.ts chat penny
 # npm script (bring your own secrets)
 npm run mcp
 
-# Or wrap with op for Claude Code
+# Or wrap with op for MCP host
 claude mcp add clawmon -- op run --env-file .env.op --account <your-id> -- npm run mcp
 ```
 
 ## How It Works
 
-- **Hatching** -- Mulberry32 PRNG (same as Claude Code's buddy system) rolls species, rarity, stats deterministically from your user ID. LLM generates name + personality based on species + role.
+- **Hatching** -- Mulberry32 PRNG rolls species, rarity, and stats deterministically from your user ID. LLM generates name + personality based on species + role.
 - **Roles** -- each role defines what the clawmon pays attention to, how often it engages, and what skills it gets.
 - **Skills** -- Claude API tool use. The clawmon decides when to calculate, search, or save notes. Up to 5 tool iterations per message.
 - **Memory** -- markdown files with YAML frontmatter in `~/.clawmon/clawmons/<name>/memory/`. Human-readable, inspectable, yours.
 - **Streaming** -- responses stream token-by-token via Opus 4.6. Skill activity shows in real-time.
-- **MCP** -- runs as a stdio MCP server exposing 5 tools to Claude Code.
+- **MCP** -- runs as a stdio MCP server exposing 10 tools to any MCP-compatible host.
+
+## Backlog
+
+See [BACKLOG.md](BACKLOG.md) for the prioritized task list, MVP gap analysis, and time estimates.
 
 ## License
 

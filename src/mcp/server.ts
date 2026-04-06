@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-// Clawmon MCP Server -- the primary interface for clawmons inside Claude Code.
-// All interaction happens here. The standalone CLI is for development/management only.
+// Clawmon MCP Server -- exposes clawmon tools via Model Context Protocol.
+// The primary interface when running inside an MCP-compatible host.
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

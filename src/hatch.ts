@@ -19,7 +19,7 @@ import { renderSprite } from './sprites/render.js';
 import { debug } from './debug.js';
 import chalk from 'chalk';
 
-// --- Mulberry32 PRNG (same as Claude Code's buddy system) ---
+// --- Mulberry32 PRNG (deterministic hatching) ---
 
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;

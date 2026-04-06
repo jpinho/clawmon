@@ -1,4 +1,4 @@
-// Reads Claude Code's memory files to build owner context for clawmons.
+// Reads local memory files to build owner context for clawmons.
 // Sources: ~/.claude/CLAUDE.md, ~/.claude/projects/<project>/memory/ files
 
 import { readFile, readdir } from 'node:fs/promises';
@@ -132,7 +132,7 @@ export function formatOwnerContext(profile: OwnerProfile): string {
 
   if (sections.length === 0) return '';
 
-  return `\n\nHere is context about your owner gathered from their Claude Code sessions:\n\n${sections.join('\n\n')}`;
+  return `\n\nHere is context about your owner gathered from their previous sessions:\n\n${sections.join('\n\n')}`;
 }
 
 /**
