@@ -14,7 +14,7 @@ import {
 } from './types.js';
 import { type Role, ROLES, ROLE_CATEGORIES, getRolesByCategory, getRole } from './roles.js';
 import { generateSoul } from './api.js';
-import { saveClawmon, listClawmons } from './memory/store.js';
+import { saveClawmon, listClawmons, findClawmonByName } from './memory/store.js';
 import { renderSprite } from './sprites/render.js';
 import { debug } from './debug.js';
 import chalk from 'chalk';
@@ -235,8 +235,12 @@ export async function hatchClawmon(userId: string, roleId: string, index: number
   console.log(chalk.dim(`  Cadence: ${role.cadence}`));
   console.log();
 
-  // Build full clawmon
-  const id = soul.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  // Build full clawmon with collision-safe ID
+  let id = soul.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+  const existing = await findClawmonByName(id);
+  if (existing) {
+    id = `${id}-${Date.now().toString(36).slice(-4)}`;
+  }
   const clawmon: Clawmon = {
     id,
     bones,
@@ -249,7 +253,7 @@ export async function hatchClawmon(userId: string, roleId: string, index: number
   // Persist
   await saveClawmon(clawmon);
 
-  console.log(chalk.green(`  [${soul.name} has joined your council as: ${role.name}]`));
+  console.log(chalk.green(`  [${soul.name} has joined your family as: ${role.name}]`));
   console.log(chalk.dim(`  Talk: clawmon talk ${id} "Hello!"`));
   console.log(chalk.dim(`  Show: clawmon show ${id}`));
   console.log();

@@ -403,10 +403,6 @@ export async function chat(
   for (let i = 0; i < maxIterations; i++) {
     debug(`chat: iteration ${i + 1}/${maxIterations}`);
 
-    // Check if this is the final iteration (no tools) or a tool-use iteration
-    // Stream on the final text response, use non-streaming for tool iterations
-    const isToolIteration = i > 0; // after first round, we're likely handling tool results
-
     try {
       const stream = getClient().messages.stream({
         model: CHAT_MODEL,
@@ -431,7 +427,7 @@ export async function chat(
         (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
       );
 
-      if (toolUseBlocks.length === 0 || stopReason === 'end_turn') {
+      if (toolUseBlocks.length === 0) {
         // No tool use -- return streamed text
         const textBlocks = finalMessage.content.filter(
           (block): block is Anthropic.TextBlock => block.type === 'text'
