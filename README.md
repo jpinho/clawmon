@@ -2,13 +2,13 @@
 
 # Clawmon
 
-### Your life council. Hatch. Evolve. Rebirth.
+### Persistent agent UX in the terminal
 
 ![Clawmon Hero](assets/hero.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Hatch AI companions that live in your terminal. They have personalities, roles, skills, memories -- and they remember you across sessions.**
+**A terminal-native system exploring whether persistent agent relationships outperform disposable chat interactions for real workflows.**
 
 </div>
 
@@ -16,11 +16,13 @@
 
 ## What is Clawmon?
 
-Clawmon is a companion ecosystem that lives in your terminal. You hatch companions, give them roles -- financial advisor, career coach, best friend, sleep guardian -- and they observe your life, collect notes, and speak up when they have something worth saying.
+Clawmon is a companion system exploring a simple idea: AI becomes more useful when it has identity, memory, and role specialization over time.
 
-Each clawmon has a species, a personality, stats, and skills. A Financial Advisor can search the web for ETF prices and calculate compound interest. A Sleep Guardian notices your late-night sessions. A Best Friend just listens.
+Instead of one generic assistant, you hatch companions with distinct roles and personalities that persist across sessions, use constrained tools, and collaborate as a council. A Financial Advisor tracks your savings goals across weeks. A Career Coach notices patterns in your professional growth. A Sleep Guardian flags your late-night sessions.
 
-They're not chatbots. They're persistent creatures with memory, character, and purpose.
+The core product question: **do persistent agent relationships outperform disposable chat interactions?**
+
+The technical challenges are memory shaping, role stability, tool ergonomics, and lifecycle design -- deciding what should be remembered, when agents should act, and how to keep them useful without becoming noisy, shallow, or gimmicky.
 
 <div align="center">
 
@@ -28,36 +30,13 @@ They're not chatbots. They're persistent creatures with memory, character, and p
 
 </div>
 
-## Quick Start
+## The Interaction Loop
+
+The current system proves the core loop: hatch, talk, remember, recall, act.
 
 ```bash
-cd ~/clawmon
-op run --env-file .env.op --account <your-op-account> -- npx tsx src/index.ts hatch
+clawmon hatch financial-advisor
 ```
-
-No role specified? You'll see suggestions:
-
-```
-  Who do you need in your life?
-
-  1) The Best Friend (Inner Circle)
-     Knows your life, celebrates wins, listens when it's hard.
-     "You mentioned feeling stuck yesterday. How'd the meeting go today?"
-
-  2) The Financial Advisor (Growth Circle)
-     Budgeting, spending patterns, saving goals.
-     "Dining out 4 times this week -- that's about EUR 120. Want me to track it?"
-
-  3) The Career Coach (Growth Circle)
-     Tracks your professional growth and helps you level up.
-     "You've been doing a lot of architecture work lately. Is that where you want your career heading?"
-
-  To hatch, pick a role:
-  clawmon hatch best-friend
-  clawmon hatch financial-advisor
-```
-
-Pick a role and hatch:
 
 ```
   ~~ Clawmon Hatching Ceremony ~~
@@ -74,15 +53,10 @@ Pick a role and hatch:
 
   "Let's turn those coins into treasures!"
 
-  What Penny will do for you:
-  Tracks spending you mention, maintains a budget picture,
-  nudges you toward your savings goals.
-  Cadence: Daily
-
-  [Penny has joined your council as: The Financial Advisor]
+  [Penny has joined your family as: The Financial Advisor]
 ```
 
-Every clawmon gets a unique sprite, stats, and personality card:
+Every companion gets deterministic traits (Mulberry32 PRNG), an LLM-generated personality, and a unique card:
 
 <div align="center">
 
@@ -90,9 +64,7 @@ Every clawmon gets a unique sprite, stats, and personality card:
 
 </div>
 
-## Talk to Your Clawmon
-
-Natural language with `@mentions`:
+### Talk naturally. The agent decides what tools to use.
 
 ```bash
 clawmon "@penny I want to save 5000 euros by december"
@@ -110,21 +82,15 @@ clawmon "@penny I want to save 5000 euros by december"
   Knowing the "why" helps keep the savings fire burning!
 ```
 
-Penny autonomously checked the date, calculated the monthly target, and saved the goal to her memory -- all in character.
+Penny autonomously checked the date, calculated the monthly target, and saved the goal to memory -- all in character. Next session, she remembers.
 
-## Interactive Chat (REPL)
-
-Stay in a conversation instead of one-shot messages:
+### Interactive REPL
 
 ```bash
 clawmon chat penny
 ```
 
 ```
-  (@@) Penny (The Financial Advisor)
-  "Let's turn those coins into treasures!"
-  Type your message. Ctrl+C to exit.
-
   you > how's my savings goal?
   (@@) Penny
   You're aiming for EUR 5,000 by December...
@@ -138,21 +104,60 @@ clawmon chat penny
   Penny's Notes (2)
   [goal] Savings goal: EUR 5,000 by December 2026
   [preference] Owner prefers direct financial advice
-
-  you > /exit
 ```
 
-## Skills
+## Role Specialization
 
-Clawmons have skills based on their role. A Financial Advisor gets different tools than a Best Friend.
+19 predefined roles across 5 categories. Roles are not labels -- they shape which tools the agent gets, what it pays attention to, and how it speaks.
 
-```bash
-clawmon skills penny
+<div align="center">
+
+![Browse roles](demo/demo-roles.gif)
+
+</div>
+
+| Circle | Roles |
+|--------|-------|
+| **Inner Circle** | best-friend, organizer, cheerleader, memory-keeper, mirror |
+| **Growth** | career-coach, financial-advisor, fitness-buddy, creative-muse, learning-guide |
+| **Reflection** | journaler, relationship-coach, strategist, dream-tracker |
+| **Life Skills** | sleep-guardian, social-connector |
+| **Wild Cards** | philosopher, chaos-agent, companion |
+
+Custom roles evolve over time. A companion spawned to "help me through a breakup" can naturally evolve into a "fresh start guide" as your needs shift.
+
+## Memory System
+
+Memory is the hard problem. Clawmon uses file-based storage with typed entries -- not an opaque vector store.
+
+```
+~/.clawmon/clawmons/penny/memory/
+├── MEMORY.md                    # index
+├── savings-goal.md              # [goal] Save €5,000 by December
+└── prefers-direct-feedback.md   # [preference] No sugar-coating
 ```
 
+Each memory has a type (`observation`, `pattern`, `preference`, `fact`, `goal`, `insight`), a creation date, and plain-text content. The clawmon decides when to save -- you just talk naturally.
+
+See [MEMORY-DESIGN.md](MEMORY-DESIGN.md) for the full design: what gets stored, what gets summarized, what gets forgotten, and how memory stays useful instead of decaying into noise.
+
+## Safety and Behavior Boundaries
+
+Persistent agents with memory need tighter constraints than stateless chatbots. Clawmon defines boundaries around:
+
+- When an agent should refuse to act
+- When it should ask instead of assuming
+- When it should not store memory
+- How role constraints prevent overreach
+
+See [SAFETY.md](SAFETY.md) for the full behavioral specification.
+
+## Skill System
+
+Skills are constrained by role. A Financial Advisor gets `calculator` + `web_search`. A Best Friend gets only `save_note` + `date_time`. The agent decides when to use tools -- up to 5 agentic iterations per message.
+
 ```
-  Penny's Skills
-  Role: The Financial Advisor
+  Penny's Skills (The Financial Advisor)
 
   calculator    -- math, budgets, compound interest
   web_search    -- current prices, rates, comparisons (via Brave API)
@@ -160,7 +165,40 @@ clawmon skills penny
   save_note     -- remember important things about you
 ```
 
-The clawmon decides when to use skills -- you just talk naturally.
+## Proactive Behavior (Coming Soon)
+
+Agents that don't wait for you to talk. They work toward your goals on a schedule.
+
+<div align="center">
+
+![Scheduled clawmons](demo/demo-scheduled.gif)
+
+</div>
+
+A Financial Advisor checks deposit rates every Monday. A Career Coach reviews your week. You wake up and your council has already left you notes.
+
+The design challenge: proactive agents must be useful without being noisy. See [SAFETY.md](SAFETY.md) for the intervention boundaries.
+
+## Evaluation Framework
+
+Even lightweight evals matter for persistent agent systems. Clawmon tracks:
+
+- **Role consistency** -- does the agent stay in character across sessions?
+- **Recall usefulness** -- are stored memories retrieved at the right time?
+- **Tool-choice correctness** -- does the agent pick the right skill?
+- **Session-to-session continuity** -- does context carry over meaningfully?
+
+See [EVALS.md](EVALS.md) for the evaluation framework and methodology.
+
+## MCP Integration
+
+Clawmon runs as an MCP server, exposing 10 tools to any MCP-compatible host. Talk to your clawmons inside Claude Code, or any other MCP client:
+
+```bash
+claude mcp add clawmon -- bash ~/clawmon/bin/clawmon-mcp.sh
+```
+
+The MCP path exercises the same agentic loop as the CLI but returns a single text block (no streaming). This is a useful test case for how persistent agents behave when embedded inside other AI systems.
 
 ## Commands
 
@@ -177,7 +215,7 @@ clawmon chat penny                      # interactive REPL
 clawmon talk penny "quick question"     # explicit one-shot
 
 # Viewing
-clawmon council                         # see all your clawmons
+clawmon family                          # see all your clawmons
 clawmon show penny                      # full card with sprite and stats
 clawmon notes penny                     # see collected observations
 clawmon skills penny                    # see available skills
@@ -188,80 +226,6 @@ clawmon import penny.json               # import from JSON
 
 # Debug
 clawmon --debug "@penny hello"          # verbose output for troubleshooting
-```
-
-## MCP Integration
-
-Clawmon runs as an MCP server. Talk to your clawmons directly in any MCP-compatible host:
-
-> "Talk to Penny about my budget"
-> "Show me Penny's card"
-> "What has Penny noticed about me?"
-> "Show my council"
-
-Setup:
-
-```bash
-claude mcp add clawmon -- bash ~/clawmon/bin/clawmon-mcp.sh
-```
-
-## Roles
-
-19 roles across 5 categories. Each shapes the clawmon's personality, skills, and what it pays attention to.
-
-<div align="center">
-
-![Browse roles](demo/demo-roles.gif)
-
-</div>
-
-| Circle | Roles |
-|--------|-------|
-| **Inner Circle** | best-friend, organizer, cheerleader, memory-keeper, mirror |
-| **Growth** | career-coach, financial-advisor, fitness-buddy, creative-muse, learning-guide |
-| **Reflection** | journaler, relationship-coach, strategist, dream-tracker |
-| **Life Skills** | sleep-guardian, social-connector |
-| **Wild Cards** | philosopher, chaos-agent, companion |
-
-## Secrets
-
-Clawmon needs two API keys. No plaintext `.env` files -- use your preferred secret manager.
-
-**Required keys:**
-- `ANTHROPIC_API_KEY` -- Claude API (Opus 4.6 for chat, Sonnet for soul generation)
-- `BRAVE_API_KEY` -- Brave Search API for web search skill (free at brave.com/search/api)
-
-**Option 1: 1Password CLI**
-
-Create a `.env.op` file with `op://` references:
-
-```
-ANTHROPIC_API_KEY=op://Private/your-item/ANTHROPIC_API_KEY
-BRAVE_API_KEY=op://Private/your-item/BRAVE_API_KEY
-```
-
-Then run with:
-
-```bash
-op run --env-file .env.op --account <your-account-id> -- npx tsx src/index.ts chat penny
-```
-
-**Option 2: Environment variables**
-
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-export BRAVE_API_KEY=BSA...
-npx tsx src/index.ts chat penny
-```
-
-**MCP server:**
-
-```bash
-# npm script (bring your own secrets)
-npm run mcp
-
-# Or wrap with op for MCP host
-claude mcp add clawmon -- op run --env-file .env.op --account <your-id> -- npm run mcp
 ```
 
 ## Tech Stack
@@ -276,33 +240,34 @@ claude mcp add clawmon -- op run --env-file .env.op --account <your-id> -- npm r
 | **Storage** | File-based -- JSON state, Markdown + YAML frontmatter for memories |
 | **MCP** | Model Context Protocol SDK (stdio transport) |
 | **Secrets** | 1Password CLI (`op run`) -- no plaintext .env files |
+| **Testing** | Vitest (70%+ coverage) |
 
-## Architecture
+## Documentation
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, data flows, and module structure.
+| Document | What it covers |
+|----------|---------------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design, module graph, data flows, data model |
+| [MEMORY-DESIGN.md](MEMORY-DESIGN.md) | Memory storage, retrieval, summarization, decay |
+| [SAFETY.md](SAFETY.md) | Behavior boundaries, refusal, memory constraints |
+| [EVALS.md](EVALS.md) | Evaluation framework for persistent agent quality |
+| [BACKLOG.md](BACKLOG.md) | Prioritized task list and MVP gap analysis |
 
-## How It Works
+## Secrets
 
-- **Hatching** -- Mulberry32 PRNG rolls species, rarity, and stats deterministically from your user ID. LLM generates name + personality based on species + role.
-- **Roles** -- each role defines what the clawmon pays attention to, how often it engages, and what skills it gets.
-- **Skills** -- Claude API tool use. The clawmon decides when to calculate, search, or save notes. Up to 5 tool iterations per message.
-- **Memory** -- markdown files with YAML frontmatter in `~/.clawmon/clawmons/<name>/memory/`. Human-readable, inspectable, yours.
-- **Streaming** -- responses stream token-by-token via Opus 4.6. Skill activity shows in real-time.
-- **MCP** -- runs as a stdio MCP server exposing 10 tools to any MCP-compatible host.
+Clawmon needs two API keys. No plaintext `.env` files -- use your preferred secret manager.
 
-## Autonomous Schedules (Coming Soon)
+- `ANTHROPIC_API_KEY` -- Claude API (Opus 4.6 for chat, Sonnet for soul generation)
+- `BRAVE_API_KEY` -- Brave Search API (free at brave.com/search/api)
 
-Clawmons that don't just wait for you to talk -- they work toward your goals on a schedule. A Financial Advisor checks rates every Monday. A Career Coach reviews your week. You wake up and your council has already left you notes.
+```bash
+# 1Password CLI (preferred)
+op run --env-file .env.op --account <your-account-id> -- npx tsx src/index.ts chat penny
 
-<div align="center">
-
-![Scheduled clawmons](demo/demo-scheduled.gif)
-
-</div>
-
-## Backlog
-
-See [BACKLOG.md](BACKLOG.md) for the prioritized task list, MVP gap analysis, and time estimates.
+# Or set environment variables directly
+export ANTHROPIC_API_KEY=sk-ant-...
+export BRAVE_API_KEY=BSA...
+npx tsx src/index.ts chat penny
+```
 
 ## License
 
