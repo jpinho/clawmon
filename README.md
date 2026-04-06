@@ -18,7 +18,7 @@
 
 Clawmon is a companion system exploring a simple idea: AI becomes more useful when it has identity, memory, and role specialization over time.
 
-Instead of one generic assistant, you hatch companions with distinct roles and personalities that persist across sessions, use constrained tools, and collaborate as a council. A Financial Advisor tracks your savings goals across weeks. A Career Coach notices patterns in your professional growth. A Sleep Guardian flags your late-night sessions.
+Instead of one generic assistant, you hatch companions with distinct roles and personalities that persist across sessions, use constrained tools, and collaborate as a family. A Financial Advisor tracks your savings goals across weeks. A Career Coach notices patterns in your professional growth. A Sleep Guardian flags your late-night sessions.
 
 The core product question: **do persistent agent relationships outperform disposable chat interactions?**
 
@@ -175,7 +175,7 @@ Agents that don't wait for you to talk. They work toward your goals on a schedul
 
 </div>
 
-A Financial Advisor checks deposit rates every Monday. A Career Coach reviews your week. You wake up and your council has already left you notes.
+A Financial Advisor checks deposit rates every Monday. A Career Coach reviews your week. You wake up and your family has already left you notes.
 
 The design challenge: proactive agents must be useful without being noisy. See [SAFETY.md](SAFETY.md) for the intervention boundaries.
 

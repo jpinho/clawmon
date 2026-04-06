@@ -138,6 +138,7 @@ program
       id, bones, soul,
       roleId: 'custom',
       customRole,
+      customSkills: skills,
       hatchedAt: new Date().toISOString(),
       interactions: 0,
     };
@@ -188,6 +189,7 @@ program
         id, bones, soul,
         roleId: 'custom',
         customRole,
+        customSkills: skills,
         familyId,
         hatchedAt: new Date().toISOString(),
         interactions: 0,
@@ -512,7 +514,7 @@ program
     }
 
     const role = getRole(clawmon.roleId);
-    const registry = createSkillRegistry(clawmon.roleId);
+    const registry = createSkillRegistry(clawmon.roleId, clawmon.customSkills);
 
     console.log();
     console.log(chalk.bold(`  ${clawmon.soul.name}'s Skills`));

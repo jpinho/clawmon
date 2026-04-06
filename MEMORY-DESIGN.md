@@ -119,6 +119,6 @@ What the code actually does today vs what this doc describes.
 ## Open Questions
 
 - **Deduplication** -- the model sometimes saves the same fact with slightly different wording. Current mitigation: filename collision (same title overwrites). Needs semantic dedup.
-- **Cross-agent memory** -- should a Family share a memory pool? Currently each clawmon has its own. Shared memory creates coordination problems but enables richer council behavior.
+- **Cross-agent memory** -- should a Family share a memory pool? Currently each clawmon has its own. Shared memory creates coordination problems but enables richer family behavior.
 - **Memory conflicts** -- what happens when a goal changes? The old "save €5,000" goal should be superseded, not coexist with "save €8,000." Needs an update-or-replace mechanism.
 - **Privacy** -- all memories are local files. But they are injected into API calls. The owner should know exactly what is sent. A `--dry-run` flag that shows the full prompt without calling the API would help.

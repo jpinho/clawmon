@@ -12,7 +12,7 @@ The system prompt constrains each agent: "Stay in your role." When a user asks s
 
 1. Acknowledge the question
 2. Explain it falls outside their expertise
-3. Suggest which role could help (if one exists in the council)
+3. Suggest which role could help (if one exists in the family)
 
 ```
   you > penny, I've been feeling really anxious lately

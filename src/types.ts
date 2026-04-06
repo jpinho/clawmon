@@ -79,6 +79,7 @@ export interface Clawmon {
   soul: ClawmonSoul;
   roleId: string; // role from ROLES registry, or 'custom'
   customRole?: CustomRole; // for prompt-based clawmons
+  customSkills?: string[]; // skill IDs for custom-role clawmons (from LLM suggestion)
   familyId?: string; // groups clawmons spawned together
   hatchedAt: string; // ISO date
   interactions: number;

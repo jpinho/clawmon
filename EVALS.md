@@ -117,4 +117,4 @@ The eval framework is a design target, not running infrastructure. The first man
 
 - **Emotional safety** -- whether the agent handles sensitive topics appropriately (covered in [SAFETY.md](SAFETY.md))
 - **System performance** -- latency, token usage, cost per session (operational concern, not quality concern)
-- **Multi-agent coordination** -- how well a council of agents works together (requires family features to mature first)
+- **Multi-agent coordination** -- how well a family of agents works together (requires family features to mature first)
