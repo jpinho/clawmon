@@ -52,8 +52,12 @@ export async function showClawmon(clawmon: Clawmon): Promise<void> {
   console.log(`  ${chalk.bold.white(clawmon.soul.name)}`);
 
   // Role
-  if (role) {
+  if (clawmon.customRole) {
+    console.log(`  ${chalk.cyan(clawmon.customRole.currentRole)}`);
+    console.log(chalk.dim(`  ${clawmon.customRole.currentDescription}`));
+  } else if (role) {
     console.log(`  ${chalk.cyan(role.name)}`);
+    console.log(chalk.dim(`  ${role.whatItDoes}`));
   }
 
   console.log();

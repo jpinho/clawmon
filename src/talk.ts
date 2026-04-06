@@ -184,6 +184,20 @@ export async function replWithClawmon(clawmon: Clawmon): Promise<void> {
       ]);
 
       clawmon.interactions += 1;
+
+      // Check for role evolution (custom roles only)
+      if (clawmon.customRole && clawmon.interactions % 10 === 0) {
+        const freshMemories = await loadMemories(clawmon.id);
+        const evolved = await evolveCustomRole(clawmon, freshMemories);
+        if (evolved) {
+          clawmon.customRole = evolved;
+          const last = evolved.evolution[evolved.evolution.length - 1]!;
+          console.log(chalk.yellow(`  ${name} evolved: "${last.fromRole}" -> "${last.toRole}"`));
+          console.log(chalk.dim(`  Reason: ${last.reason}`));
+          console.log();
+        }
+      }
+
       await updateClawmon(clawmon);
 
     } catch (err: any) {

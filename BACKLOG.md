@@ -192,22 +192,23 @@ The README needs a visual demo. Record a terminal GIF showing:
 
 ## P3: Post-MVP (v0.2+)
 
-### 16. Lifecycle Engine (Evolution)
+### 16. Agent Lifecycle Design
 **Est: 6-8h**
 
-- XP system: interactions earn experience
-- Evolution thresholds: Baby -> Juvenile -> Adult -> Elder
-- `clawmon evolve <name>` with animation
-- Sprite changes per evolution stage
-- Stat boosts on evolution
+The persistent agent UX question: what happens when an agent's purpose is fulfilled? A companion spawned for "help me through a breakup" should not persist indefinitely after the user has moved on.
 
-### 17. Rebirth System
+- Lifecycle stages based on interaction patterns and memory density
+- Explicit completion: `clawmon complete <name>` archives the agent and its memories
+- Purpose fulfillment detection: LLM evaluates whether the original purpose has been met
+
+### 17. Memory Inheritance
 **Est: 4-6h**
 
-- Elder clawmons can fade
-- Wisdom seed extraction (compressed memory)
-- New clawmon inherits seed
-- Lineage tracking
+When a companion's purpose is complete, its accumulated knowledge should be transferable.
+
+- Compressed memory extraction (distilled insights, not raw notes)
+- New companions can inherit relevant context from completed agents
+- Lineage tracking: which insights came from which agent
 
 ### 18. Session Hooks (Beyond Greeting)
 **Est: 3-4h**
@@ -260,6 +261,6 @@ The 6 P0 items total ~14h. With the README GIF (#15) that's ~16h. A focused week
 
 The hook is not "another AI CLI tool." The hook is:
 
-> **Clawmon** -- Hatch AI companions that live in your terminal. They have personalities, skills, and evolving roles. Spawn a family of 5 for a life goal, and they each bring a different perspective. Open source, runs on Claude.
+> **Clawmon** is a terminal-native system exploring whether AI agents with persistent identity, memory, and role specialization outperform disposable chat interactions. Companions hatch with distinct roles, accumulate typed observations, use constrained tools, and evolve their purpose over time.
 
-The demo GIF shows: spawn a family -> talk to one -> it uses skills -> show the card with ASCII art and stat bars. That's the screenshot moment.
+The demo shows: spawn a companion for a real purpose, talk naturally, watch it use tools autonomously, see it remember and recall context across sessions. The persistent relationship is the product.

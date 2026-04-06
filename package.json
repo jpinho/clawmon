@@ -1,7 +1,7 @@
 {
   "name": "clawmon",
   "version": "0.1.0",
-  "description": "Hatch AI companions that live in your terminal",
+  "description": "Terminal-native persistent agent UX -- identity, memory, role specialization",
   "type": "module",
   "bin": {
     "clawmon": "./dist/cli.js"

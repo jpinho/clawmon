@@ -39,7 +39,7 @@ export function debug(...args: unknown[]): void {
 
 program
   .name('clawmon')
-  .description('Hatch AI companions that live in your terminal')
+  .description('Terminal-native persistent agent UX -- identity, memory, role specialization')
   .version('0.1.0')
   .option('--debug', 'Show verbose debug output')
   .hook('preAction', (thisCommand) => {
