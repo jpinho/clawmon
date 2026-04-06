@@ -46,9 +46,9 @@ const ROLE_SKILLS: Record<string, string[]> = {
   'chaos-agent': ['calculator', 'web_search'],
 };
 
-export function createSkillRegistry(roleId: string): SkillRegistry {
+export function createSkillRegistry(roleId: string, customSkills?: string[]): SkillRegistry {
   const defaultSkills = ROLE_SKILLS['_default'] ?? [];
-  const roleSkills = ROLE_SKILLS[roleId] ?? [];
+  const roleSkills = customSkills ?? ROLE_SKILLS[roleId] ?? [];
   const enabledNames = new Set([...defaultSkills, ...roleSkills]);
 
   const skills = ALL_SKILLS.filter(s => enabledNames.has(s.name));
@@ -72,8 +72,8 @@ export function createSkillRegistry(roleId: string): SkillRegistry {
   };
 }
 
-export function listAvailableSkills(roleId: string): string[] {
+export function listAvailableSkills(roleId: string, customSkills?: string[]): string[] {
   const defaultSkills = ROLE_SKILLS['_default'] ?? [];
-  const roleSkills = ROLE_SKILLS[roleId] ?? [];
+  const roleSkills = customSkills ?? ROLE_SKILLS[roleId] ?? [];
   return [...new Set([...defaultSkills, ...roleSkills])];
 }

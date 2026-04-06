@@ -216,7 +216,7 @@ The MCP server (`src/mcp/server.ts`) exposes clawmon functionality over stdio tr
 |------|-------------|
 | `talk_to_clawmon` | Send a message, get a response (runs the full agentic loop) |
 | `show_clawmon` | Get the profile card (sprite, stats, role) |
-| `council` | List all clawmons |
+| `family` | List all clawmons |
 | `clawmon_notes` | Read a clawmon's memory |
 | `clawmon_skills` | List available skills |
 
@@ -250,5 +250,5 @@ Beyond the 19 predefined roles, clawmons can be spawned with a free-text purpose
 
 | Use case | Model | Why |
 |----------|-------|-----|
-| Chat (agentic loop) | claude-sonnet-4-20250514 | Balances quality and speed for conversational responses with tool use |
+| Chat (agentic loop) | claude-opus-4-6 | Highest quality for persistent agent interactions with tool use |
 | Soul generation | claude-sonnet-4-20250514 | Fast, cheap, only needs to produce a small JSON object |

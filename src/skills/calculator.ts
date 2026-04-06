@@ -22,14 +22,10 @@ export const calculatorSkill: Skill = {
     const expr = String(input.expression ?? '');
     const label = input.label ? String(input.label) : undefined;
 
-    // Sanitize: only allow numbers, operators, parens, whitespace, Math.*, and dots
-    const sanitized = expr.replace(/\s/g, '');
-    if (!/^[\d+\-*/().,%eE\s]+(Math\.(round|ceil|floor|sqrt|pow|abs|min|max)\([\d+\-*/().,%eE\s]*\))*[\d+\-*/().,%eE\s]*$/.test(sanitized) && !sanitized.match(/^[0-9+\-*/().%eE\s^Math.roundceilflorsqtpwabminx,]+$/)) {
-      // Fallback: try a more permissive check
-      const forbidden = /[;{}\[\]`'"\\$&|~!?<>:=]/;
-      if (forbidden.test(expr)) {
-        return `Error: Expression contains forbidden characters. Only math operators and Math.* functions allowed.`;
-      }
+    // Reject expressions with dangerous characters (injection vectors)
+    const forbidden = /[;{}\[\]`'"\\$&|~!?<>:=]/;
+    if (forbidden.test(expr)) {
+      return `Error: Expression contains forbidden characters. Only math operators and Math.* functions allowed.`;
     }
 
     try {

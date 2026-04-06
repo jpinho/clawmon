@@ -402,7 +402,7 @@ export async function chat(
   onToken?: OnToken,
   onSkillUse?: OnSkillUse,
 ): Promise<{ reply: string; skillsUsed: string[] }> {
-  const registry = createSkillRegistry(clawmon.roleId);
+  const registry = createSkillRegistry(clawmon.roleId, clawmon.customSkills);
   const tools = registry.getToolDefinitions();
   const skillNames = tools.map(t => t.name).join(', ');
 

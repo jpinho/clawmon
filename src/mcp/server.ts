@@ -147,6 +147,7 @@ server.tool(
       soul,
       roleId: 'custom',
       customRole,
+      customSkills: skills,
       hatchedAt: new Date().toISOString(),
       interactions: 0,
     };
@@ -218,6 +219,7 @@ server.tool(
         soul,
         roleId: 'custom',
         customRole,
+        customSkills: skills,
         familyId,
         hatchedAt: new Date().toISOString(),
         interactions: 0,
@@ -511,7 +513,7 @@ server.tool(
     }
 
     const role = getRole(clawmon.roleId);
-    const registry = createSkillRegistry(clawmon.roleId);
+    const registry = createSkillRegistry(clawmon.roleId, clawmon.customSkills);
 
     const lines = [`**${clawmon.soul.name}'s Skills**${role ? ` (${role.name})` : ''}\n`];
     for (const skill of registry.skills) {
