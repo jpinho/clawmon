@@ -150,7 +150,7 @@ const HAT_LINES: Record<Hat, string> = {
   beanie: '   (___)    ',
 };
 
-export function renderSprite(bones: ClawmonBones, frame = 0): string[] {
+export function renderSprite(bones: ClawmonBones, _frame = 0): string[] {
   const body = (BODIES[bones.species] ?? FALLBACK).map(line =>
     line.replaceAll('{E}', bones.eye),
   );

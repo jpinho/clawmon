@@ -526,7 +526,7 @@ server.tool(
 
 server.tool(
   'clawmon_roles',
-  'List all available roles that can be assigned when hatching a new clawmon. Shows which roles are already taken in the council.',
+  'List all available roles that can be assigned when hatching a new clawmon. Shows which roles are already taken in your family.',
   {},
   async () => {
     const existing = await listClawmons().catch(() => []);
@@ -546,7 +546,7 @@ server.tool(
     }
 
     if (takenRoleIds.size > 0) {
-      lines.push(`*✓ = already in your council (${takenRoleIds.size}/${ROLES.length})*`);
+      lines.push(`*✓ = already in your family (${takenRoleIds.size}/${ROLES.length})*`);
     }
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
