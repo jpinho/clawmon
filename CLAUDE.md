@@ -28,7 +28,7 @@ src/
 │   ├── date-time.ts    # Date/time calculations
 │   └── note-taker.ts   # Save observations to clawmon memory
 ├── mcp/
-│   └── server.ts       # MCP server: 5 tools for Claude Code integration
+│   └── server.ts       # MCP server: 10 tools via stdio transport
 bin/
 └── clawmon-mcp.sh      # MCP launcher with 1Password secret injection
 ```
@@ -50,7 +50,7 @@ npx tsx src/index.ts --debug <any command>      # verbose debug output
 
 ## Key Patterns
 
-- **Mulberry32 PRNG** for deterministic hatching (same as Claude Code's buddy system)
+- **Mulberry32 PRNG** for deterministic hatching from user ID
 - **Role-first hatching** -- you pick a role, creature is generated for it. No roleless clawmons.
 - **Natural language routing** -- non-command input treated as message, `@name` routes to specific clawmon
 - **Streaming** -- Opus 4.6 responses stream token-by-token. Skill activity shows in real-time.
@@ -78,9 +78,9 @@ Managed via 1Password CLI (`op run --env-file`). Never use local .env files with
 Full design docs in `private-docs/` (gitignored):
 - ARCHITECTURE.md, ROLES.md, SPECIES.md, CLI.md, MEMORY-SYSTEM.md
 - CHANNELS.md (WhatsApp), VISION.md (long-term phases), ROADMAP.md
-- USE-CASES.md (CV Keeper, Budget Owl, etc.), RESEARCH.md (Claude Code source analysis)
+- USE-CASES.md (CV Keeper, Budget Owl, etc.), RESEARCH.md (prior art analysis)
 
 ## Current Phase: POC
 
 README and public docs only reflect what's shipped. Vision stays in private-docs.
-Next: lifecycle (evolution, rebirth), more species sprites, Claude Code hooks.
+Next: lifecycle (evolution, rebirth), more species sprites, session hooks.

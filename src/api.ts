@@ -316,7 +316,7 @@ async function buildSystemPrompt(
   memories: MemoryEntry[],
   skillNames: string,
 ): Promise<string> {
-  // Load owner context from Claude Code memories (cached per process)
+  // Load owner context from local memories (cached per process)
   if (ownerContextCache === null) {
     try {
       const profile = await loadOwnerProfile();
