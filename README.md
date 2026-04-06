@@ -22,6 +22,12 @@ Each clawmon has a species, a personality, stats, and skills. A Financial Adviso
 
 They're not chatbots. They're persistent creatures with memory, character, and purpose.
 
+<div align="center">
+
+![Meet your council](demo/demo-council.gif)
+
+</div>
+
 ## Quick Start
 
 ```bash
@@ -75,6 +81,14 @@ Pick a role and hatch:
 
   [Penny has joined your council as: The Financial Advisor]
 ```
+
+Every clawmon gets a unique sprite, stats, and personality card:
+
+<div align="center">
+
+![Clawmon cards](demo/demo-cards.gif)
+
+</div>
 
 ## Talk to Your Clawmon
 
@@ -195,6 +209,12 @@ claude mcp add clawmon -- bash ~/clawmon/bin/clawmon-mcp.sh
 
 19 roles across 5 categories. Each shapes the clawmon's personality, skills, and what it pays attention to.
 
+<div align="center">
+
+![Browse roles](demo/demo-roles.gif)
+
+</div>
+
 | Circle | Roles |
 |--------|-------|
 | **Inner Circle** | best-friend, organizer, cheerleader, memory-keeper, mirror |
@@ -244,6 +264,23 @@ npm run mcp
 claude mcp add clawmon -- op run --env-file .env.op --account <your-id> -- npm run mcp
 ```
 
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Language** | TypeScript (strict mode, ES2022) |
+| **Runtime** | Node.js with tsx for development |
+| **AI** | Claude Opus 4.6 (chat), Sonnet (soul generation) via Anthropic SDK |
+| **CLI** | Commander.js + Chalk for colored terminal output |
+| **Search** | Brave Search API |
+| **Storage** | File-based -- JSON state, Markdown + YAML frontmatter for memories |
+| **MCP** | Model Context Protocol SDK (stdio transport) |
+| **Secrets** | 1Password CLI (`op run`) -- no plaintext .env files |
+
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full system design, data flows, and module structure.
+
 ## How It Works
 
 - **Hatching** -- Mulberry32 PRNG rolls species, rarity, and stats deterministically from your user ID. LLM generates name + personality based on species + role.
@@ -253,6 +290,16 @@ claude mcp add clawmon -- op run --env-file .env.op --account <your-id> -- npm r
 - **Streaming** -- responses stream token-by-token via Opus 4.6. Skill activity shows in real-time.
 - **MCP** -- runs as a stdio MCP server exposing 10 tools to any MCP-compatible host.
 
+## Autonomous Schedules (Coming Soon)
+
+Clawmons that don't just wait for you to talk -- they work toward your goals on a schedule. A Financial Advisor checks rates every Monday. A Career Coach reviews your week. You wake up and your council has already left you notes.
+
+<div align="center">
+
+![Scheduled clawmons](demo/demo-scheduled.gif)
+
+</div>
+
 ## Backlog
 
 See [BACKLOG.md](BACKLOG.md) for the prioritized task list, MVP gap analysis, and time estimates.
@@ -260,3 +307,11 @@ See [BACKLOG.md](BACKLOG.md) for the prioritized task list, MVP gap analysis, an
 ## License
 
 [MIT](LICENSE)
+
+---
+
+<div align="center">
+
+Built with love by [jpinho](https://pandemicode.dev/about)
+
+</div>
