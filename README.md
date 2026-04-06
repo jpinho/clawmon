@@ -26,9 +26,19 @@ The technical challenges are memory shaping, role stability, tool ergonomics, an
 
 <div align="center">
 
-![Meet your council](demo/demo-council.gif)
+![Meet your family](demo/demo-council.gif)
 
 </div>
+
+## Quick Start
+
+```bash
+git clone https://github.com/jpinho/clawmon && cd clawmon
+npm install
+
+export ANTHROPIC_API_KEY=sk-ant-...
+npx tsx src/index.ts hatch financial-advisor
+```
 
 ## The Interaction Loop
 
@@ -124,7 +134,23 @@ clawmon chat penny
 | **Life Skills** | sleep-guardian, social-connector |
 | **Wild Cards** | philosopher, chaos-agent, companion |
 
-Custom roles evolve over time. A companion spawned to "help me through a breakup" can naturally evolve into a "fresh start guide" as your needs shift.
+### Custom Roles and Evolution
+
+Beyond predefined roles, you can spawn a companion for any purpose:
+
+```bash
+clawmon spawn "I'm starting a business and need help staying accountable"
+```
+
+The system generates a role name, description, cadence, and skill set tailored to that purpose. Every 10 interactions, the role is re-evaluated: a companion spawned to "help me through a breakup" can naturally evolve into a "fresh start guide" as your needs shift. Evolution history is tracked -- what the role was, what it became, and why.
+
+You can also spawn an entire team at once:
+
+```bash
+clawmon spawn-family "I'm training for a triathlon" -n 3
+```
+
+This generates complementary roles (e.g., a training planner, a nutrition advisor, a recovery coach) that work together as a family.
 
 ## Memory System
 
