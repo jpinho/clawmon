@@ -8,7 +8,7 @@ Terminal-native persistent agent UX system -- identity, memory, role specializat
 src/
 ├── cli.ts              # CLI entry point + natural language router + REPL
 ├── index.ts            # Re-export of cli.ts
-├── types.ts            # Core types: ClawmonBones, ClawmonSoul, Clawmon, stats, 30 species
+├── types.ts            # Core types: ClawmonBones, ClawmonSoul, Clawmon, stats, 30 species (18 with sprites)
 ├── hatch.ts            # Hatching: Mulberry32 PRNG, role suggestions, ceremony
 ├── talk.ts             # Conversation: streaming output, REPL loop, skill activity display
 ├── show.ts             # Card display (sprite, stats, role, notes)
