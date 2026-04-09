@@ -228,13 +228,18 @@ See [EVALS.md](EVALS.md) for the evaluation framework and methodology.
 
 ## MCP Integration
 
-Clawmon runs as an MCP server, exposing 10 tools to any MCP-compatible host. Talk to your clawmons inside Claude Code, or any other MCP client:
+Clawmon runs as an MCP server, exposing 13 tools to any MCP-compatible host. Talk to your clawmons inside Claude Code, or any other MCP client:
 
 ```bash
 claude mcp add clawmon -- bash ~/clawmon/bin/clawmon-mcp.sh
 ```
 
-The MCP path exercises the same agentic loop as the CLI but returns a single text block (no streaming). This is a useful test case for how persistent agents behave when embedded inside other AI systems.
+Two tools are designed for fast, API-free integration with your session:
+
+- **`clawmon_context`** -- loads a companion's personality, role, memories, and recent history into your current session instantly. No AI call. Use when you want a companion's knowledge as reference without the latency of talking to them.
+- **`save_session`** -- writes an observation directly to a companion's memory files. No AI call. Use at the end of a session to capture what happened.
+
+The full `talk_to_clawmon` tool runs the agentic loop (with AI) for when you want a companion to respond in character with tool use.
 
 ## Commands
 

@@ -10,6 +10,7 @@ import {
   initClawmonDir,
   isInitialized,
   loadConfig,
+  saveConfig,
   listClawmons,
   findClawmonByName,
   loadMemories,
@@ -668,6 +669,51 @@ server.tool(
     }
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
+  },
+);
+
+// --- Tool: clawmon_config ---
+
+server.tool(
+  'clawmon_config',
+  "View or update clawmon configuration. Use to set the memory root to an Obsidian vault path so companion memories appear as navigable notes in Obsidian. Set memoryRoot to a vault path, or 'reset' to use the default ~/.clawmon/ location.",
+  {
+    key: z.string().optional().describe('Config key to set (currently: "memoryRoot"). Omit to view current config.'),
+    value: z.string().optional().describe('Value to set. Use "reset" to clear back to default.'),
+  },
+  async ({ key, value }) => {
+    if (!isInitialized()) {
+      await initClawmonDir();
+    }
+    const config = await loadConfig();
+
+    if (!key) {
+      const lines = [
+        '**Clawmon Config**\n',
+        `**memoryRoot:** ${config.memoryRoot ? `\`${config.memoryRoot}\`` : '`~/.clawmon/` (default)'}`,
+        `**clawmons:** ${config.clawmons.length} hatched`,
+        '',
+        '*Set Obsidian vault:* `clawmon_config` with key `memoryRoot` and value `/path/to/vault/clawmon`',
+      ];
+      return { content: [{ type: 'text', text: lines.join('\n') }] };
+    }
+
+    if (key === 'memoryRoot') {
+      if (!value) {
+        const current = config.memoryRoot ?? '~/.clawmon/ (default)';
+        return { content: [{ type: 'text', text: `**memoryRoot:** \`${current}\`` }] };
+      }
+      if (value === 'reset') {
+        delete config.memoryRoot;
+        await saveConfig(config);
+        return { content: [{ type: 'text', text: 'Memory root reset to default (`~/.clawmon/`). New memories will be written there.' }] };
+      }
+      config.memoryRoot = value;
+      await saveConfig(config);
+      return { content: [{ type: 'text', text: `Memory root set to \`${value}\`. New memories will be written there. Existing memories stay in \`~/.clawmon/\`.` }] };
+    }
+
+    return { content: [{ type: 'text', text: `Unknown config key: "${key}". Available: \`memoryRoot\`` }] };
   },
 );
 

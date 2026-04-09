@@ -219,6 +219,8 @@ The MCP server (`src/mcp/server.ts`) exposes clawmon functionality over stdio tr
 | `family` | List all clawmons |
 | `clawmon_notes` | Read a clawmon's memory |
 | `clawmon_skills` | List available skills |
+| `clawmon_context` | Load a companion's full context (personality, role, memories, history) -- no API call |
+| `save_session` | Save an observation to a companion's memory -- no API call |
 
 The MCP path does not stream -- it returns the complete response as a single text block. This is a limitation of the MCP protocol (tools can't stream results).
 
