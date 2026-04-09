@@ -247,7 +247,16 @@ server.tool(
     }
 
     const config = await loadConfig();
-    const family = await generateFamily(purpose, count);
+
+    let family;
+    try {
+      family = await generateFamily(purpose, count);
+    } catch (err: any) {
+      if (err.message?.includes('authentication') || err.message?.includes('apiKey') || err.message?.includes('resolve authentication')) {
+        return { content: [{ type: 'text', text: 'No API key found. The MCP server needs ANTHROPIC_API_KEY set. Restart with `op run` or set the env var.' }] };
+      }
+      throw err;
+    }
 
     if (family.length === 0) {
       return { content: [{ type: 'text', text: 'Failed to generate family. Try a more specific description.' }] };

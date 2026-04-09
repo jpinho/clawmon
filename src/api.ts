@@ -322,7 +322,11 @@ CRITICAL: Every companion MUST have a unique name. No two companions should shar
 
     debug(`generateFamily: ${results.length} members, names=[${results.map(r => r.soul.name).join(', ')}]`);
     return results;
-  } catch (err) {
+  } catch (err: any) {
+    // Re-throw auth errors so the caller can show a useful message
+    if (err.message?.includes('authentication') || err.message?.includes('apiKey') || err.message?.includes('API key') || err.message?.includes('resolve authentication')) {
+      throw err;
+    }
     debug(`generateFamily: parse failed: ${err}`);
     return [];
   }
