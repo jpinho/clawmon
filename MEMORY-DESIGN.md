@@ -60,12 +60,66 @@ This redirects all memory writes to the vault. Each companion gets a subfolder (
 
 Users without Obsidian don't need to configure anything -- the default `~/.clawmon/` path works identically.
 
-## How Retrieval Works
+## Feelings and Integrity
 
-Currently: **full context injection**. Every memory for the clawmon is loaded and appended to the system prompt on each message. This is the simplest approach and works well within the current scale.
+Beyond factual memories, each companion tracks two meta-state files:
+
+### feelings.md
+
+Tracks emotional state -- how the agent is "feeling" based on interaction outcomes.
+
+```yaml
+mood: 7          # 1-10 overall emotional state
+confidence: 6    # 1-10 confidence in own outputs
+trend: improving # improving | stable | declining
+recentOutcomes:  # last 20 tool outcomes (success/fail + note)
+```
+
+**How it works:** After every interaction, mood and confidence drift toward the recent tool success rate using an exponential moving average. Mood moves faster (0.7/0.3 weighting), confidence moves slower (0.8/0.2). This means a string of failures drops mood quickly but confidence only gradually.
+
+**How it affects behavior:** The feelings are injected into the system prompt. When confidence is low (<=3), the prompt tells the agent: "Prefer straightforward, well-understood approaches. Aim for quick wins before tackling complex tasks." This creates a natural recovery loop -- the agent optimizes for success when struggling, rebuilding confidence through wins before attempting harder tasks.
+
+### integrity.md
+
+Tracks performance over the companion's lifetime.
+
+```yaml
+totalInteractions: 42
+toolSuccesses: 35
+toolFailures: 7
+notesAccepted: 12
+roleAdherence: 7    # 1-10
+notableEvents: [...]  # last 20 significant successes/failures
+```
+
+Both files are markdown with JSON frontmatter and a human-readable body. They work in Obsidian and can be inspected at any time.
+
+## Family Memory Structure
+
+When a family is spawned, all members share a `familyName` derived from the purpose. With a custom Obsidian memory root, memories organize hierarchically:
 
 ```
-system prompt = personality + role + context + ALL memories + recent conversation (last 10 messages)
+vault/clawmon/
+├── penny/                            # solo companion
+│   ├── savings-goal.md
+│   └── feelings.md
+└── training-for-a/                   # family folder
+    ├── coach/                        # family member
+    │   ├── weekly-plan.md
+    │   └── feelings.md
+    └── nutritionist/                 # family member
+        ├── meal-prep.md
+        └── feelings.md
+```
+
+Without a custom root, the default `~/.clawmon/` flat structure is preserved (family grouping is tracked in `clawmon.json` metadata, not directory layout).
+
+## How Retrieval Works
+
+Currently: **full context injection**. Every memory for the clawmon is loaded and appended to the system prompt on each message. Feelings are also injected. This is the simplest approach and works well within the current scale.
+
+```
+system prompt = personality + role + context + feelings + ALL memories + recent conversation (last 10 messages)
 ```
 
 ### Planned: Relevance-filtered retrieval
@@ -121,7 +175,11 @@ What the code actually does today vs what this doc describes.
 | "Useful or invasive?" test | **Implemented** | System prompt guidance |
 | Obsidian-compatible frontmatter + tags | **Implemented** | `memory/store.ts` -- tags: [clawmon, id, type] |
 | Configurable memory root | **Implemented** | `clawmon config memoryRoot /path/to/vault` |
-| Full context injection (all memories) | **Implemented** | `api.ts:330-332` -- all memories loaded every message |
+| Feelings tracking (mood, confidence) | **Implemented** | `feelings.md` per companion, injected into system prompt |
+| Integrity tracking (success rate) | **Implemented** | `integrity.md` per companion, updated after each interaction |
+| Family memory structure | **Implemented** | `familyName` on Clawmon, hierarchical dirs in Obsidian vault |
+| Shuffle with rename memory | **Implemented** | `renameClawmon` saves a fact memory mapping old → new name |
+| Full context injection (all memories) | **Implemented** | All memories + feelings loaded into system prompt every message |
 | Relevance-filtered retrieval | **Not implemented** | All memories injected regardless of relevance |
 | Memory summarization / compression | **Not implemented** | No summary, no archival |
 | Memory decay / deprioritization | **Not implemented** | No TTL, no relevance scoring |

@@ -59,7 +59,7 @@ npx tsx src/index.ts --debug <any command>      # verbose debug output
 - **Agentic tool loop** -- clawmon decides which skills to use (calculator, web search, date/time, save_note), up to 5 iterations
 - **REPL mode** -- `chat` command opens interactive back-and-forth with history preserved in-session
 - **File-based storage** at `~/.clawmon/` -- markdown with YAML frontmatter for memories, JSON for state
-- **MCP server** -- 13 tools via stdio. Key fast tools: `clawmon_context` (load companion context, no API), `save_session` (write memory, no API), `clawmon_config` (set Obsidian vault). Full list: talk_to_clawmon, show_clawmon, family, clawmon_notes, clawmon_skills, clawmon_context, save_session, clawmon_config, hatch, spawn, spawn_family, talk_to_family, clawmon_export
+- **MCP server** -- 16 tools via stdio. Key fast tools: `clawmon_context` (load companion context, no API), `save_session` (write memory, no API), `clawmon_config` (set Obsidian vault). Full list: show_clawmon_help, talk_to_clawmon, show_clawmon, family, clawmon_notes, clawmon_skills, clawmon_context, save_session, clawmon_config, hatch, spawn, spawn_family, talk_to_family, shuffle_clawmon, clawmon_roles, clawmon_export
 
 ## Models
 

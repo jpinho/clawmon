@@ -38,6 +38,53 @@ const server = new McpServer({
   version: '0.1.0',
 });
 
+// --- Tool: show_clawmon (help) ---
+
+server.tool(
+  'show_clawmon_help',
+  'List all available clawmon MCP tools with descriptions. Use when the user asks what clawmon can do, or needs help with the MCP interface.',
+  {},
+  async () => {
+    const tools = [
+      ['**Conversation**', ''],
+      ['`talk_to_clawmon`', 'Talk to a companion (full AI agentic loop with tools). Slow but rich.'],
+      ['`talk_to_family`', 'Roundtable discussion with all family members.'],
+      ['', ''],
+      ['**Fast context (no AI call)**', ''],
+      ['`clawmon_context`', 'Load a companion\'s personality, role, memories, and history into your session. Instant.'],
+      ['`save_session`', 'Save an observation to a companion\'s memory. Instant.'],
+      ['', ''],
+      ['**Creating**', ''],
+      ['`hatch_clawmon`', 'Hatch a companion with a predefined role (e.g. financial-advisor, best-friend).'],
+      ['`spawn_clawmon`', 'Spawn a companion from a natural language purpose. Role evolves over time.'],
+      ['`spawn_family`', 'Spawn a family of complementary companions for a broad goal.'],
+      ['`shuffle_clawmon`', 'Regenerate a companion\'s name and personality. Keeps role, memories, conversations.'],
+      ['', ''],
+      ['**Viewing**', ''],
+      ['`show_clawmon`', 'Display a companion\'s full profile card (sprite, stats, role, personality).'],
+      ['`family`', 'List all companions with roles, species, and interaction counts.'],
+      ['`clawmon_notes`', 'See what a companion has observed and remembered about you.'],
+      ['`clawmon_skills`', 'See what skills a companion has based on their role.'],
+      ['`clawmon_roles`', 'Browse all 19 predefined roles and see which are taken.'],
+      ['', ''],
+      ['**Config & Export**', ''],
+      ['`clawmon_config`', 'View or set config (e.g. memoryRoot for Obsidian vault integration).'],
+      ['`clawmon_export`', 'Export a companion to portable JSON for backup or transfer.'],
+      ['`show_clawmon_help`', 'This tool -- list all available tools.'],
+    ];
+
+    const lines = ['**Clawmon MCP Tools (16)**\n'];
+    for (const [name, desc] of tools) {
+      if (!name) { lines.push(''); continue; }
+      if (!desc) { lines.push(name); continue; }
+      lines.push(`${name} -- ${desc}`);
+    }
+    lines.push('\n*Fast tools (clawmon_context, save_session) skip the AI -- use them for session context and note-taking.*');
+
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  },
+);
+
 // --- Tool: hatch_clawmon ---
 
 server.tool(

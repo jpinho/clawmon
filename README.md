@@ -160,10 +160,33 @@ Memory is the hard problem. Clawmon uses file-based storage with typed entries -
 ~/.clawmon/clawmons/penny/memory/
 ├── MEMORY.md                    # index
 ├── savings-goal.md              # [goal] Save €5,000 by December
-└── prefers-direct-feedback.md   # [preference] No sugar-coating
+├── prefers-direct-feedback.md   # [preference] No sugar-coating
+├── feelings.md                  # mood, confidence, trend (auto-updated)
+└── integrity.md                 # tool success rate, interaction count
 ```
 
 Each memory has a type (`observation`, `pattern`, `preference`, `fact`, `goal`, `insight`), a creation date, and plain-text content. The clawmon decides when to save -- you just talk naturally.
+
+### Feelings and Integrity
+
+Each companion tracks its emotional state and performance:
+
+- **`feelings.md`** -- mood (1-10), confidence (1-10), recent outcome trend. Updated after every interaction. When confidence is low, the system prompt tells the agent to prefer straightforward approaches and aim for quick wins before tackling complex tasks.
+- **`integrity.md`** -- total interactions, tool success/failure rate, notes saved, notable events. A running scorecard of reliability.
+
+Both files are markdown with structured frontmatter -- human-readable and Obsidian-compatible.
+
+### Family Memory Structure
+
+When using an Obsidian vault, family members share a parent folder:
+
+```
+vault/clawmon/
+└── training-for-a-triathlon/     # family name
+    ├── coach/                    # companion memories
+    ├── nutritionist/
+    └── recovery-guide/
+```
 
 ### Obsidian Integration
 
@@ -228,18 +251,21 @@ See [EVALS.md](EVALS.md) for the evaluation framework and methodology.
 
 ## MCP Integration
 
-Clawmon runs as an MCP server, exposing 13 tools to any MCP-compatible host. Talk to your clawmons inside Claude Code, or any other MCP client:
+Clawmon runs as an MCP server, exposing 16 tools to any MCP-compatible host. Talk to your clawmons inside Claude Code, or any other MCP client:
 
 ```bash
 claude mcp add clawmon -- bash ~/clawmon/bin/clawmon-mcp.sh
 ```
 
-Two tools are designed for fast, API-free integration with your session:
+| Category | Tools | AI Call? |
+|----------|-------|---------|
+| **Conversation** | `talk_to_clawmon`, `talk_to_family` | Yes (Opus) |
+| **Fast context** | `clawmon_context`, `save_session` | No -- instant |
+| **Creating** | `hatch_clawmon`, `spawn_clawmon`, `spawn_family`, `shuffle_clawmon` | Yes (Sonnet) |
+| **Viewing** | `show_clawmon`, `family`, `clawmon_notes`, `clawmon_skills`, `clawmon_roles` | No |
+| **Config** | `clawmon_config`, `clawmon_export`, `show_clawmon_help` | No |
 
-- **`clawmon_context`** -- loads a companion's personality, role, memories, and recent history into your current session instantly. No AI call. Use when you want a companion's knowledge as reference without the latency of talking to them.
-- **`save_session`** -- writes an observation directly to a companion's memory files. No AI call. Use at the end of a session to capture what happened.
-
-The full `talk_to_clawmon` tool runs the agentic loop (with AI) for when you want a companion to respond in character with tool use.
+The fast tools (`clawmon_context`, `save_session`) skip the AI entirely -- they read/write files directly. Use them for session context loading and end-of-session note capture without the latency of a nested LLM call.
 
 ## Commands
 
@@ -261,7 +287,8 @@ clawmon show penny                      # full card with sprite and stats
 clawmon notes penny                     # see collected observations
 clawmon skills penny                    # see available skills
 
-# Portability
+# Managing
+clawmon shuffle penny                   # regenerate name/personality, keep memories
 clawmon export penny                    # export to JSON
 clawmon import penny.json               # import from JSON
 
