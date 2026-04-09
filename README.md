@@ -349,6 +349,10 @@ op run --env-file .env.op --account <your-account-id> -- npx tsx src/index.ts ch
 # Or set environment variables directly
 export ANTHROPIC_API_KEY=sk-ant-...
 export BRAVE_API_KEY=BSA...
+
+npx clawmon chat penny
+
+# or if running the code locally
 npx tsx src/index.ts chat penny
 ```
 
