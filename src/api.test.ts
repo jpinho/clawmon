@@ -32,9 +32,15 @@ vi.mock('@anthropic-ai/sdk', () => {
   };
 });
 
-// Mock saveMemory to avoid filesystem writes
+// Mock store to avoid filesystem writes
 vi.mock('./memory/store.js', () => ({
   saveMemory: vi.fn(),
+  loadFeelings: vi.fn().mockResolvedValue({ mood: 5, confidence: 5, recentOutcomes: [], trend: 'stable', updatedAt: '' }),
+  saveFeelings: vi.fn(),
+  updateFeelingsAfterInteraction: vi.fn().mockImplementation((f) => f),
+  loadIntegrity: vi.fn().mockResolvedValue({ totalInteractions: 0, toolSuccesses: 0, toolFailures: 0, notesAccepted: 0, roleAdherence: 7, notableEvents: [], updatedAt: '' }),
+  saveIntegrity: vi.fn(),
+  updateIntegrityAfterInteraction: vi.fn().mockImplementation((i) => i),
 }));
 
 // Mock claude-context to avoid filesystem reads

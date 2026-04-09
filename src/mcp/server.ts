@@ -12,6 +12,9 @@ import {
   loadConfig,
   saveConfig,
   listClawmons,
+  uniqueClawmonId,
+  renameClawmon,
+  generateFamilyIdentity,
   findClawmonByName,
   loadMemories,
   loadRecentConversation,
@@ -22,7 +25,7 @@ import {
   listFamily,
 } from '../memory/store.js';
 import { getRole, ROLES, ROLE_CATEGORIES, getRolesByCategory } from '../roles.js';
-import { chat, generateCustomRole, generateFamily } from '../api.js';
+import { chat, generateSoul, generateCustomRole, generateFamily } from '../api.js';
 import { hatchClawmon, suggestRoles, rollBones } from '../hatch.js';
 import { renderSprite, renderFace } from '../sprites/render.js';
 import { createSkillRegistry } from '../skills/registry.js';
@@ -141,7 +144,7 @@ server.tool(
 
     const { soul, customRole, skills } = await generateCustomRole(purpose);
 
-    const id = soul.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    const id = await uniqueClawmonId(soul.name);
     const clawmon: Clawmon = {
       id,
       bones,
@@ -203,9 +206,10 @@ server.tool(
       return { content: [{ type: 'text', text: 'Failed to generate family. Try a more specific description.' }] };
     }
 
-    const familyId = `family-${Date.now().toString(36)}`;
+    const { familyId, familyName } = generateFamilyIdentity(purpose);
+    const batchIds = new Set<string>();
     const results: string[] = [`**~~ Family Spawned: ${family.length} Clawmons ~~**\n`];
-    results.push(`Family: \`${familyId}\``);
+    results.push(`**${familyName}** (\`${familyId}\`)`);
     results.push(`Purpose: *${purpose}*\n`);
 
     for (let i = 0; i < family.length; i++) {
@@ -213,7 +217,7 @@ server.tool(
       const index = config.clawmons.length + i;
       const bones = rollBones(config.userId, index);
 
-      const id = soul.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+      const id = await uniqueClawmonId(soul.name, batchIds);
       const clawmon: Clawmon = {
         id,
         bones,
@@ -222,6 +226,7 @@ server.tool(
         customRole,
         customSkills: skills,
         familyId,
+        familyName,
         hatchedAt: new Date().toISOString(),
         interactions: 0,
       };
@@ -669,6 +674,55 @@ server.tool(
     }
 
     return { content: [{ type: 'text', text: lines.join('\n') }] };
+  },
+);
+
+// --- Tool: shuffle ---
+
+server.tool(
+  'shuffle_clawmon',
+  "Regenerate a clawmon's name and personality while keeping their role, memories, and conversations. Use when the user doesn't like a companion's name or wants a fresh personality for the same role.",
+  {
+    name: z.string().describe('Name of the clawmon to shuffle'),
+  },
+  async ({ name }) => {
+    if (!isInitialized()) {
+      return { content: [{ type: 'text', text: 'No clawmons yet.' }] };
+    }
+
+    const clawmon = await findClawmonByName(name);
+    if (!clawmon) {
+      const all = await listClawmons();
+      const names = all.map(c => `@${c.soul.name.toLowerCase()}`).join(', ');
+      return { content: [{ type: 'text', text: `Clawmon "${name}" not found. Available: ${names}` }] };
+    }
+
+    const role = getRole(clawmon.roleId);
+    let newSoul;
+
+    if (role) {
+      newSoul = await generateSoul(clawmon.bones, role);
+    } else {
+      const purpose = clawmon.customRole?.purpose ?? 'general companion';
+      const result = await generateCustomRole(purpose);
+      newSoul = result.soul;
+    }
+
+    const newId = await uniqueClawmonId(newSoul.name);
+    const updated = await renameClawmon(clawmon.id, newId, newSoul);
+
+    const face = renderFace(updated.bones);
+    return {
+      content: [{
+        type: 'text',
+        text: [
+          `${face} **${clawmon.soul.name}** → **${updated.soul.name}**\n`,
+          `*"${updated.soul.catchphrase}"*`,
+          `${updated.soul.personality}\n`,
+          `Memories and conversations preserved.`,
+        ].join('\n'),
+      }],
+    };
   },
 );
 

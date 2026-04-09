@@ -21,8 +21,17 @@ const {
   listClawmons,
   updateClawmon,
   findClawmonByName,
+  uniqueClawmonId,
+  generateFamilyIdentity,
+  renameClawmon,
   saveMemory,
   loadMemories,
+  loadFeelings,
+  saveFeelings,
+  updateFeelingsAfterInteraction,
+  loadIntegrity,
+  saveIntegrity,
+  updateIntegrityAfterInteraction,
   saveConversation,
   loadRecentConversation,
   exportClawmon,
@@ -370,5 +379,172 @@ describe('custom memory root (Obsidian integration)', () => {
 
     const reloaded = await loadConfig();
     expect(reloaded.memoryRoot).toBe(VAULT_DIR);
+  });
+});
+
+describe('uniqueClawmonId', () => {
+  beforeEach(async () => {
+    await initClawmonDir();
+  });
+
+  it('returns slugified name when no collision', async () => {
+    const id = await uniqueClawmonId('Penny');
+    expect(id).toBe('penny');
+  });
+
+  it('appends suffix when ID already exists', async () => {
+    await saveClawmon(makeClawmon({ id: 'penny' }));
+    const id = await uniqueClawmonId('Penny');
+    expect(id).toBe('penny-2');
+  });
+
+  it('respects batch IDs for family spawning', async () => {
+    const batch = new Set<string>();
+    const id1 = await uniqueClawmonId('Guide', batch);
+    const id2 = await uniqueClawmonId('Guide', batch);
+    expect(id1).toBe('guide');
+    expect(id2).toBe('guide-2');
+    expect(batch.has('guide')).toBe(true);
+    expect(batch.has('guide-2')).toBe(true);
+  });
+});
+
+describe('generateFamilyIdentity', () => {
+  it('returns a family name from purpose words', () => {
+    const { familyName } = generateFamilyIdentity('training for a triathlon');
+    expect(familyName).toBe('training for a triathlon');
+  });
+
+  it('returns a family ID with family- prefix', () => {
+    const { familyId } = generateFamilyIdentity('starting a business');
+    expect(familyId).toMatch(/^family-[a-z0-9]+$/);
+  });
+
+  it('generates different IDs for different purposes', () => {
+    const a = generateFamilyIdentity('training for a triathlon');
+    const b = generateFamilyIdentity('starting a business');
+    expect(a.familyId).not.toBe(b.familyId);
+  });
+});
+
+describe('renameClawmon', () => {
+  beforeEach(async () => {
+    await initClawmonDir();
+    await saveClawmon(makeClawmon());
+    await saveMemory('test-penny', makeMemory());
+  });
+
+  it('renames the clawmon and preserves memories', async () => {
+    const newSoul = { ...makeClawmon().soul, name: 'Blaze' };
+    const updated = await renameClawmon('test-penny', 'blaze', newSoul);
+
+    expect(updated.id).toBe('blaze');
+    expect(updated.soul.name).toBe('Blaze');
+
+    const loaded = await loadClawmon('blaze');
+    expect(loaded).not.toBeNull();
+
+    const oldLoaded = await loadClawmon('test-penny');
+    expect(oldLoaded).toBeNull();
+  });
+
+  it('saves a rename memory to the new clawmon', async () => {
+    const newSoul = { ...makeClawmon().soul, name: 'Blaze' };
+    await renameClawmon('test-penny', 'blaze', newSoul);
+
+    const memories = await loadMemories('blaze');
+    const renameMemory = memories.find(m => m.name.includes('Renamed from'));
+    expect(renameMemory).toBeDefined();
+    expect(renameMemory!.content).toContain('Penny');
+    expect(renameMemory!.content).toContain('blaze');
+  });
+
+  it('updates config to replace old ID', async () => {
+    const newSoul = { ...makeClawmon().soul, name: 'Blaze' };
+    await renameClawmon('test-penny', 'blaze', newSoul);
+
+    const config = await loadConfig();
+    expect(config.clawmons).toContain('blaze');
+    expect(config.clawmons).not.toContain('test-penny');
+  });
+});
+
+describe('feelings', () => {
+  beforeEach(async () => {
+    await initClawmonDir();
+    await saveClawmon(makeClawmon());
+  });
+
+  it('returns defaults when no feelings file exists', async () => {
+    const feelings = await loadFeelings('test-penny');
+    expect(feelings.mood).toBe(5);
+    expect(feelings.confidence).toBe(5);
+    expect(feelings.trend).toBe('stable');
+  });
+
+  it('saves and loads feelings', async () => {
+    const feelings = { mood: 8, confidence: 7, recentOutcomes: [], trend: 'improving' as const, updatedAt: '' };
+    await saveFeelings('test-penny', feelings);
+
+    const loaded = await loadFeelings('test-penny');
+    expect(loaded.mood).toBe(8);
+    expect(loaded.confidence).toBe(7);
+  });
+
+  it('updates mood and confidence after successful interaction', () => {
+    const feelings = { mood: 5, confidence: 5, recentOutcomes: [] as any[], trend: 'stable' as const, updatedAt: '' };
+    const updated = updateFeelingsAfterInteraction(feelings, true, 2);
+    expect(updated.mood).toBeGreaterThanOrEqual(5);
+    expect(updated.recentOutcomes).toHaveLength(1);
+    expect(updated.recentOutcomes[0].success).toBe(true);
+  });
+
+  it('decreases mood after failed interaction', () => {
+    const feelings = { mood: 5, confidence: 5, recentOutcomes: [] as any[], trend: 'stable' as const, updatedAt: '' };
+    const updated = updateFeelingsAfterInteraction(feelings, false, 1, 'tool error');
+    expect(updated.recentOutcomes[0].success).toBe(false);
+  });
+
+  it('does not record outcome when no tools used', () => {
+    const feelings = { mood: 5, confidence: 5, recentOutcomes: [] as any[], trend: 'stable' as const, updatedAt: '' };
+    const updated = updateFeelingsAfterInteraction(feelings, true, 0);
+    expect(updated.recentOutcomes).toHaveLength(0);
+  });
+});
+
+describe('integrity', () => {
+  beforeEach(async () => {
+    await initClawmonDir();
+    await saveClawmon(makeClawmon());
+  });
+
+  it('returns defaults when no integrity file exists', async () => {
+    const integrity = await loadIntegrity('test-penny');
+    expect(integrity.totalInteractions).toBe(0);
+    expect(integrity.toolSuccesses).toBe(0);
+  });
+
+  it('saves and loads integrity', async () => {
+    const integrity = { totalInteractions: 10, toolSuccesses: 8, toolFailures: 2, notesAccepted: 3, roleAdherence: 8, notableEvents: [], updatedAt: '' };
+    await saveIntegrity('test-penny', integrity);
+
+    const loaded = await loadIntegrity('test-penny');
+    expect(loaded.totalInteractions).toBe(10);
+    expect(loaded.toolSuccesses).toBe(8);
+  });
+
+  it('tracks tool outcomes correctly', () => {
+    const integrity = { totalInteractions: 0, toolSuccesses: 0, toolFailures: 0, notesAccepted: 0, roleAdherence: 7, notableEvents: [] as any[], updatedAt: '' };
+    const updated = updateIntegrityAfterInteraction(
+      integrity,
+      [{ name: 'calculator', succeeded: true }, { name: 'web_search', succeeded: false }],
+      1,
+    );
+    expect(updated.totalInteractions).toBe(1);
+    expect(updated.toolSuccesses).toBe(1);
+    expect(updated.toolFailures).toBe(1);
+    expect(updated.notesAccepted).toBe(1);
+    expect(updated.notableEvents).toHaveLength(1);
+    expect(updated.notableEvents[0].event).toContain('web_search');
   });
 });

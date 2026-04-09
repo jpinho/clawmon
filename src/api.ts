@@ -3,7 +3,15 @@ import type { ClawmonBones, ClawmonSoul, Clawmon, MemoryEntry, CustomRole } from
 import type { Role } from './roles.js';
 import { RARITY_STARS } from './types.js';
 import { createSkillRegistry } from './skills/registry.js';
-import { saveMemory } from './memory/store.js';
+import {
+  saveMemory,
+  loadFeelings,
+  saveFeelings,
+  updateFeelingsAfterInteraction,
+  loadIntegrity,
+  saveIntegrity,
+  updateIntegrityAfterInteraction,
+} from './memory/store.js';
 import { debug } from './debug.js';
 import { getOwnerContext, formatContextForPrompt } from './context.js';
 import { loadOwnerProfile, formatOwnerContext } from './claude-context.js';
@@ -257,7 +265,7 @@ Respond with ONLY a valid JSON array:
   }
 ]
 
-Make each companion feel distinct in personality and purpose. They're a team, not clones.`;
+CRITICAL: Every companion MUST have a unique name. No two companions should share the same name. Make each companion feel distinct in personality and purpose. They're a team, not clones.`;
 
   debug(`generateFamily: purpose="${purpose.slice(0, 80)}", count=${capped}`);
 
@@ -282,22 +290,38 @@ Make each companion feel distinct in personality and purpose. They're a team, no
       skills: string[];
     }>;
 
-    return parsed.slice(0, capped).map(p => ({
-      soul: {
-        name: p.name,
-        personality: p.personality,
-        catchphrase: p.catchphrase,
-        voice: p.voice,
-      },
-      customRole: {
-        purpose,
-        currentRole: p.roleName,
-        currentDescription: p.roleDescription,
-        cadence: p.cadence,
-        evolution: [],
-      },
-      skills: p.skills ?? ['save_note', 'date_time'],
-    }));
+    // Deduplicate names within the family
+    const seenNames = new Set<string>();
+    const results = parsed.slice(0, capped).map(p => {
+      let name = p.name;
+      const baseName = name;
+      let suffix = 2;
+      while (seenNames.has(name.toLowerCase())) {
+        name = `${baseName}${suffix}`;
+        suffix++;
+      }
+      seenNames.add(name.toLowerCase());
+
+      return {
+        soul: {
+          name,
+          personality: p.personality,
+          catchphrase: p.catchphrase,
+          voice: p.voice,
+        },
+        customRole: {
+          purpose,
+          currentRole: p.roleName,
+          currentDescription: p.roleDescription,
+          cadence: p.cadence,
+          evolution: [],
+        },
+        skills: p.skills ?? ['save_note', 'date_time'],
+      };
+    });
+
+    debug(`generateFamily: ${results.length} members, names=[${results.map(r => r.soul.name).join(', ')}]`);
+    return results;
   } catch (err) {
     debug(`generateFamily: parse failed: ${err}`);
     return [];
@@ -315,6 +339,7 @@ async function buildSystemPrompt(
   role: Role | undefined,
   memories: MemoryEntry[],
   skillNames: string,
+  feelings?: import('./types.js').ClawmonFeelings,
 ): Promise<string> {
   // Load owner context from local memories (cached per process)
   if (ownerContextCache === null) {
@@ -387,7 +412,11 @@ Do NOT save:
 - Anything outside your role's domain
 - Things the owner explicitly asks you not to remember
 
-Before saving, ask yourself: if the owner ran "clawmon notes" and saw this entry, would it feel useful or invasive? Save useful observations. Do not surveil.${skillContext}${ownerContextCache}${memoryContext}`;
+Before saving, ask yourself: if the owner ran "clawmon notes" and saw this entry, would it feel useful or invasive? Save useful observations. Do not surveil.${skillContext}${feelings ? `
+
+# Current state
+
+Your mood is ${feelings.mood}/10 and your confidence is ${feelings.confidence}/10. Your recent trend is ${feelings.trend}.${feelings.confidence <= 3 ? ' You are low on confidence right now. Prefer straightforward, well-understood approaches. Aim for quick wins before tackling complex tasks.' : ''}${feelings.mood <= 3 ? ' You are feeling rough. Be honest about it if it comes up naturally, but stay focused on being useful.' : ''}` : ''}${ownerContextCache}${memoryContext}`;
 }
 
 // --- Talk to a clawmon with streaming + tool use ---
@@ -403,12 +432,18 @@ export async function chat(
 ): Promise<{ reply: string; skillsUsed: string[] }> {
   const registry = createSkillRegistry(clawmon.roleId, clawmon.customSkills);
   const tools = registry.getToolDefinitions();
+
+  // Load feelings for prompt injection and post-interaction update
+  let feelings = await loadFeelings(clawmon.id);
+  let integrity = await loadIntegrity(clawmon.id);
+  const toolOutcomes: Array<{ name: string; succeeded: boolean }> = [];
+  let notesSavedCount = 0;
   const skillNames = tools.map(t => t.name).join(', ');
 
   debug(`chat: clawmon=${clawmon.soul.name}, model=${CHAT_MODEL}, role=${clawmon.roleId}, skills=[${skillNames}]`);
   debug(`chat: memories=${memories.length}, history=${conversationHistory.length} messages`);
 
-  const systemPrompt = await buildSystemPrompt(clawmon, role, memories, skillNames);
+  const systemPrompt = await buildSystemPrompt(clawmon, role, memories, skillNames, feelings);
 
   const messages: Anthropic.MessageParam[] = [
     ...conversationHistory.map(m => ({
@@ -456,6 +491,14 @@ export async function chat(
         );
         const reply = textBlocks.map(b => b.text).join('\n');
         debug(`chat: final reply length=${reply.length} chars, skills used=[${skillsUsed.join(', ')}]`);
+
+        // Update feelings and integrity
+        const allSucceeded = toolOutcomes.every(o => o.succeeded);
+        feelings = updateFeelingsAfterInteraction(feelings, allSucceeded, toolOutcomes.length);
+        integrity = updateIntegrityAfterInteraction(integrity, toolOutcomes, notesSavedCount);
+        await saveFeelings(clawmon.id, feelings);
+        await saveIntegrity(clawmon.id, integrity);
+
         return { reply, skillsUsed };
       }
 
@@ -483,12 +526,16 @@ export async function chat(
               updatedAt: now,
             });
             result = `Saved to memory: [${input.type}] ${input.title}`;
+            notesSavedCount++;
+            toolOutcomes.push({ name: 'save_note', succeeded: true });
           } else {
             result = await registry.execute(toolUse.name, input);
+            toolOutcomes.push({ name: toolUse.name, succeeded: !result.startsWith('Error') });
           }
         } catch (err: any) {
           debug(`chat: skill error: ${toolUse.name}: ${err.message}`);
           result = `Error executing ${toolUse.name}: ${err.message}`;
+          toolOutcomes.push({ name: toolUse.name, succeeded: false });
         }
 
         debug(`chat: tool_result name=${toolUse.name}, result=${result.slice(0, 200)}`);
@@ -509,5 +556,12 @@ export async function chat(
   }
 
   debug('chat: hit max iterations');
+
+  // Max iterations = tool loop failure, update feelings negatively
+  feelings = updateFeelingsAfterInteraction(feelings, false, toolOutcomes.length, 'hit max tool iterations');
+  integrity = updateIntegrityAfterInteraction(integrity, toolOutcomes, notesSavedCount);
+  await saveFeelings(clawmon.id, feelings);
+  await saveIntegrity(clawmon.id, integrity);
+
   return { reply: '(I got a bit carried away with my tools there. What were you asking?)', skillsUsed };
 }

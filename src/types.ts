@@ -81,6 +81,7 @@ export interface Clawmon {
   customRole?: CustomRole; // for prompt-based clawmons
   customSkills?: string[]; // skill IDs for custom-role clawmons (from LLM suggestion)
   familyId?: string; // groups clawmons spawned together
+  familyName?: string; // human-readable family name
   hatchedAt: string; // ISO date
   interactions: number;
 }
@@ -119,5 +120,27 @@ export interface MemoryEntry {
   type: 'observation' | 'pattern' | 'preference' | 'fact' | 'goal' | 'insight';
   content: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+// --- Feelings (emotional state tracking) ---
+
+export interface ClawmonFeelings {
+  mood: number;           // 1-10, how the agent "feels" overall
+  confidence: number;     // 1-10, how confident in its own outputs
+  recentOutcomes: Array<{ date: string; success: boolean; note: string }>;
+  trend: 'improving' | 'stable' | 'declining';
+  updatedAt: string;
+}
+
+// --- Integrity (performance tracking) ---
+
+export interface ClawmonIntegrity {
+  totalInteractions: number;
+  toolSuccesses: number;
+  toolFailures: number;
+  notesAccepted: number;    // notes saved that weren't deleted/corrected
+  roleAdherence: number;    // 1-10 self-assessed, updated by reflection
+  notableEvents: Array<{ date: string; event: string; positive: boolean }>;
   updatedAt: string;
 }
