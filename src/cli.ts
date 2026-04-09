@@ -7,6 +7,7 @@ import {
   initClawmonDir,
   isInitialized,
   loadConfig,
+  saveConfig,
   findClawmonByName,
   listClawmons,
   listFamily,
@@ -62,6 +63,53 @@ program
     }
     await initClawmonDir();
     console.log(chalk.green('  ~/.clawmon/ created. Ready to hatch!'));
+  });
+
+// --- config ---
+
+program
+  .command('config')
+  .description('View or set configuration options')
+  .argument('[key]', 'Config key to set (e.g. memoryRoot)')
+  .argument('[value]', 'Value to set (use "reset" to clear)')
+  .action(async (key?: string, value?: string) => {
+    if (!isInitialized()) await initClawmonDir();
+    const config = await loadConfig();
+
+    if (!key) {
+      console.log();
+      console.log(chalk.bold('  Clawmon Config'));
+      console.log();
+      console.log(`  userId:     ${chalk.dim(config.userId)}`);
+      console.log(`  memoryRoot: ${config.memoryRoot ? chalk.cyan(config.memoryRoot) : chalk.dim('~/.clawmon/ (default)')}`);
+      console.log(`  clawmons:   ${chalk.dim(`${config.clawmons.length} hatched`)}`);
+      console.log();
+      console.log(chalk.dim('  Set Obsidian vault: clawmon config memoryRoot /path/to/vault/clawmon'));
+      console.log(chalk.dim('  Reset to default:   clawmon config memoryRoot reset'));
+      console.log();
+      return;
+    }
+
+    if (key === 'memoryRoot') {
+      if (!value) {
+        console.log(config.memoryRoot ? `  memoryRoot: ${config.memoryRoot}` : chalk.dim('  memoryRoot: ~/.clawmon/ (default)'));
+        return;
+      }
+      if (value === 'reset') {
+        delete config.memoryRoot;
+        await saveConfig(config);
+        console.log(chalk.green('  Memory root reset to default (~/.clawmon/)'));
+        return;
+      }
+      config.memoryRoot = value;
+      await saveConfig(config);
+      console.log(chalk.green(`  Memory root set to: ${value}`));
+      console.log(chalk.dim('  New memories will be written there. Existing memories stay in ~/.clawmon/.'));
+      return;
+    }
+
+    console.log(chalk.red(`  Unknown config key: "${key}"`));
+    console.log(chalk.dim('  Available: memoryRoot'));
   });
 
 // --- hatch (predefined role) ---
@@ -563,7 +611,7 @@ program
 // --- Routing: known command vs natural language ---
 
 const knownCommands = new Set([
-  'init', 'hatch', 'spawn', 'spawn-family', 'talk-family',
+  'init', 'config', 'hatch', 'spawn', 'spawn-family', 'talk-family',
   'talk', 'chat', 'roles', 'show', 'notes',
   'family', 'list', 'export', 'import', 'help', 'skills',
   '-V', '--version', '-h', '--help',
