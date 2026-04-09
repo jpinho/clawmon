@@ -108,6 +108,7 @@ export interface ClawmonConfig {
   version: string;
   userId: string;
   clawmons: string[]; // list of clawmon IDs (directory names)
+  memoryRoot?: string; // custom memory root (e.g. Obsidian vault path). null = default (~/.clawmon/)
 }
 
 // --- Memory ---

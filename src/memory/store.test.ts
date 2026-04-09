@@ -15,6 +15,7 @@ const {
   initClawmonDir,
   isInitialized,
   loadConfig,
+  saveConfig,
   saveClawmon,
   loadClawmon,
   listClawmons,
@@ -27,6 +28,7 @@ const {
   exportClawmon,
   importClawmon,
   listFamily,
+  setMemoryRoot,
 } = await import('./store.js');
 
 import type { Clawmon, MemoryEntry } from '../types.js';
@@ -310,5 +312,63 @@ describe('export / import', () => {
     expect(imported.id).toBe('imported');
     const loaded = await loadClawmon('imported');
     expect(loaded).not.toBeNull();
+  });
+});
+
+describe('custom memory root (Obsidian integration)', () => {
+  const VAULT_DIR = join(TEST_HOME, 'obsidian-vault', 'clawmon');
+
+  beforeEach(async () => {
+    await initClawmonDir();
+    await saveClawmon(makeClawmon());
+    await mkdir(VAULT_DIR, { recursive: true });
+  });
+
+  afterEach(() => {
+    setMemoryRoot(null);
+  });
+
+  it('writes memories to custom root when set', async () => {
+    setMemoryRoot(VAULT_DIR);
+    await saveMemory('test-penny', makeMemory());
+
+    // Memory should be in vault, not in default location
+    const vaultFile = join(VAULT_DIR, 'test-penny', 'savings-goal.md');
+    expect(existsSync(vaultFile)).toBe(true);
+  });
+
+  it('loads memories from custom root', async () => {
+    setMemoryRoot(VAULT_DIR);
+    await saveMemory('test-penny', makeMemory());
+
+    const memories = await loadMemories('test-penny');
+    expect(memories).toHaveLength(1);
+    expect(memories[0]!.name).toBe('Savings goal');
+  });
+
+  it('includes tags in frontmatter for Obsidian', async () => {
+    setMemoryRoot(VAULT_DIR);
+    await saveMemory('test-penny', makeMemory());
+
+    const vaultFile = join(VAULT_DIR, 'test-penny', 'savings-goal.md');
+    const content = await readFile(vaultFile, 'utf-8');
+    expect(content).toContain('tags: [clawmon, test-penny, goal]');
+  });
+
+  it('falls back to default when no custom root is set', async () => {
+    setMemoryRoot(null);
+    await saveMemory('test-penny', makeMemory());
+
+    const defaultFile = join(TEST_HOME, '.clawmon', 'clawmons', 'test-penny', 'memory', 'savings-goal.md');
+    expect(existsSync(defaultFile)).toBe(true);
+  });
+
+  it('stores config memoryRoot via saveConfig', async () => {
+    const config = await loadConfig();
+    config.memoryRoot = VAULT_DIR;
+    await saveConfig(config);
+
+    const reloaded = await loadConfig();
+    expect(reloaded.memoryRoot).toBe(VAULT_DIR);
   });
 });

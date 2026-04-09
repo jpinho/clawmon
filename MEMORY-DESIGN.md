@@ -44,8 +44,21 @@ Currently ahead of schedule at €2,340 saved.
 2. **Portability** -- export a clawmon and its memories as a directory copy
 3. **Debuggability** -- when recall seems wrong, you can see the source data directly
 4. **Simplicity** -- no infrastructure, no embeddings model, no retrieval pipeline to tune
+5. **Obsidian-compatible** -- memory files are markdown with YAML frontmatter and tags, ready to drop into any Obsidian vault
 
 The trade-off is that retrieval is naive: all memories for a clawmon are loaded into context on every message. This works for small memory sets (<50 entries). It will not scale to hundreds.
+
+### Obsidian Integration
+
+Memory files include `tags: [clawmon, <companion-name>, <type>]` in frontmatter, making them instantly filterable, searchable, and graph-linked in Obsidian. Users can point the memory root at their vault:
+
+```bash
+clawmon config memoryRoot /path/to/obsidian-vault/clawmon
+```
+
+This redirects all memory writes to the vault. Each companion gets a subfolder (`vault/clawmon/penny/`). State files (config, clawmon.json, conversations) stay in `~/.clawmon/`. Only the markdown memories move.
+
+Users without Obsidian don't need to configure anything -- the default `~/.clawmon/` path works identically.
 
 ## How Retrieval Works
 
@@ -106,6 +119,8 @@ What the code actually does today vs what this doc describes.
 | MEMORY.md index | **Implemented** | `memory/store.ts:148-158` |
 | Role-scoped save instructions | **Implemented** | System prompt: "do not save anything outside your role's domain" |
 | "Useful or invasive?" test | **Implemented** | System prompt guidance |
+| Obsidian-compatible frontmatter + tags | **Implemented** | `memory/store.ts` -- tags: [clawmon, id, type] |
+| Configurable memory root | **Implemented** | `clawmon config memoryRoot /path/to/vault` |
 | Full context injection (all memories) | **Implemented** | `api.ts:330-332` -- all memories loaded every message |
 | Relevance-filtered retrieval | **Not implemented** | All memories injected regardless of relevance |
 | Memory summarization / compression | **Not implemented** | No summary, no archival |
