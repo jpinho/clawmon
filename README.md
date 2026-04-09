@@ -267,6 +267,16 @@ claude mcp add clawmon -- bash ~/clawmon/bin/clawmon-mcp.sh
 
 The fast tools (`clawmon_context`, `save_session`) skip the AI entirely -- they read/write files directly. Use them for session context loading and end-of-session note capture without the latency of a nested LLM call.
 
+### Claude Code Skill
+
+Install the bundled skill so Claude Code knows how to use clawmon tools:
+
+```bash
+cp -r skills/claude-code ~/.claude/skills/clawmon
+```
+
+This teaches Claude Code the full tool surface, recommended workflows (load context at session start, save observations at session end), and when to use fast tools vs the full agentic loop.
+
 ## Commands
 
 ```bash
