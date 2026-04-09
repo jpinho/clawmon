@@ -524,6 +524,122 @@ server.tool(
   },
 );
 
+// --- Tool: clawmon_context ---
+
+server.tool(
+  'clawmon_context',
+  "Load a clawmon's full context into your current session -- personality, role, memories, and recent conversation. This does NOT call the AI -- it reads local files instantly. Use this when you want a companion's knowledge available as reference without talking to them directly. Example: 'load penny\\'s context so you can help me with my budget'.",
+  {
+    name: z.string().describe('Name of the clawmon whose context to load'),
+  },
+  async ({ name }) => {
+    if (!isInitialized()) {
+      return { content: [{ type: 'text', text: 'No clawmons yet.' }] };
+    }
+
+    const clawmon = await findClawmonByName(name);
+    if (!clawmon) {
+      const all = await listClawmons();
+      const names = all.map(c => `@${c.soul.name.toLowerCase()}`).join(', ');
+      return { content: [{ type: 'text', text: `Clawmon "${name}" not found. Available: ${names}` }] };
+    }
+
+    const role = getRole(clawmon.roleId);
+    const memories = await loadMemories(clawmon.id);
+    const history = await loadRecentConversation(clawmon.id, 10);
+
+    const sections: string[] = [];
+
+    // Identity
+    sections.push(`# ${clawmon.soul.name}'s Context\n`);
+    sections.push(`**Species:** ${clawmon.bones.species} (${clawmon.bones.rarity})`);
+    sections.push(`**Personality:** ${clawmon.soul.personality}`);
+    sections.push(`**Voice:** ${clawmon.soul.voice}`);
+
+    // Role
+    if (clawmon.customRole) {
+      sections.push(`\n**Role:** ${clawmon.customRole.currentRole}`);
+      sections.push(`**Purpose:** ${clawmon.customRole.purpose}`);
+      sections.push(`**Description:** ${clawmon.customRole.currentDescription}`);
+      if (clawmon.customRole.evolution.length > 0) {
+        const last = clawmon.customRole.evolution[clawmon.customRole.evolution.length - 1]!;
+        sections.push(`**Last evolution:** "${last.fromRole}" → "${last.toRole}" (${last.reason})`);
+      }
+    } else if (role) {
+      sections.push(`\n**Role:** ${role.name}`);
+      sections.push(`**Description:** ${role.description}`);
+      sections.push(`**What they do:** ${role.whatItDoes}`);
+    }
+
+    // Memories
+    if (memories.length > 0) {
+      sections.push(`\n## Memories (${memories.length})\n`);
+      for (const m of memories) {
+        sections.push(`- **[${m.type}] ${m.name}**: ${m.content}`);
+      }
+    } else {
+      sections.push('\n*No memories yet.*');
+    }
+
+    // Recent conversation
+    if (history.length > 0) {
+      sections.push(`\n## Recent Conversation (last ${history.length} messages)\n`);
+      for (const msg of history) {
+        const prefix = msg.role === 'user' ? 'Owner' : clawmon.soul.name;
+        sections.push(`**${prefix}:** ${msg.content}`);
+      }
+    }
+
+    sections.push(`\n---\n*Context loaded from ${clawmon.soul.name}. ${clawmon.interactions} total interactions. Use \`save_session\` to save observations back.*`);
+
+    return { content: [{ type: 'text', text: sections.join('\n') }] };
+  },
+);
+
+// --- Tool: save_session ---
+
+server.tool(
+  'save_session',
+  "Save an observation from the current session to a clawmon's memory. This does NOT call the AI -- it writes directly to the companion's memory files. Use at the end of a session to capture what happened. Example: after a coding session, save 'Owner refactored the auth module' to a career coach, or 'Owner was working until 1am' to a sleep guardian.",
+  {
+    name: z.string().describe('Name of the clawmon to save the note to'),
+    title: z.string().describe('Short title for the note (e.g. "Late night coding session")'),
+    content: z.string().describe('The observation to remember'),
+    type: z.enum(['observation', 'pattern', 'preference', 'fact', 'goal', 'insight']).default('observation').describe('Type of memory entry'),
+  },
+  async ({ name, title, content, type }) => {
+    if (!isInitialized()) {
+      return { content: [{ type: 'text', text: 'No clawmons yet.' }] };
+    }
+
+    const clawmon = await findClawmonByName(name);
+    if (!clawmon) {
+      const all = await listClawmons();
+      const names = all.map(c => `@${c.soul.name.toLowerCase()}`).join(', ');
+      return { content: [{ type: 'text', text: `Clawmon "${name}" not found. Available: ${names}` }] };
+    }
+
+    const { saveMemory } = await import('../memory/store.js');
+    const now = new Date().toISOString();
+
+    await saveMemory(clawmon.id, {
+      name: title,
+      description: content.slice(0, 100),
+      type,
+      content,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      content: [{
+        type: 'text',
+        text: `Saved to **${clawmon.soul.name}**'s memory: [${type}] **${title}**\n\n${content}`,
+      }],
+    };
+  },
+);
+
 // --- Tool: clawmon_roles ---
 
 server.tool(
