@@ -46,6 +46,7 @@ npx tsx src/index.ts hatch financial-advisor     # hatch with role
 npx tsx src/index.ts "@penny how's my budget?"  # one-shot @mention
 npx tsx src/index.ts chat penny                 # interactive REPL
 npx tsx src/index.ts family                     # list your family
+npx tsx src/index.ts config                     # view/set config (memoryRoot for Obsidian)
 npx tsx src/index.ts --debug <any command>      # verbose debug output
 ```
 

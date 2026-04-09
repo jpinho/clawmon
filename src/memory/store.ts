@@ -7,18 +7,46 @@ import type { Clawmon, ClawmonConfig, MemoryEntry } from '../types.js';
 const CLAWMON_DIR = join(homedir(), '.clawmon');
 const CONFIG_PATH = join(CLAWMON_DIR, 'config.json');
 
+// Cached memory root -- loaded from config on first use
+let _memoryRootCache: string | null = null;
+
 // --- Directory helpers ---
 
 function clawmonDir(id: string): string {
   return join(CLAWMON_DIR, 'clawmons', id);
 }
 
-function memoryDir(id: string): string {
+function defaultMemoryDir(id: string): string {
   return join(clawmonDir(id), 'memory');
+}
+
+function memoryDir(id: string): string {
+  if (_memoryRootCache) {
+    return join(_memoryRootCache, id);
+  }
+  return defaultMemoryDir(id);
 }
 
 function conversationDir(id: string): string {
   return join(clawmonDir(id), 'conversations');
+}
+
+/** Load and cache the memory root from config. Call once at startup or before first memory operation. */
+export async function initMemoryRoot(): Promise<void> {
+  if (_memoryRootCache !== null) return;
+  try {
+    const config = await loadConfig();
+    if (config.memoryRoot) {
+      _memoryRootCache = config.memoryRoot;
+    }
+  } catch {
+    // Config not yet created -- use default
+  }
+}
+
+/** Override memory root (for testing). */
+export function setMemoryRoot(root: string | null): void {
+  _memoryRootCache = root;
 }
 
 // --- Init ---
@@ -57,6 +85,7 @@ export async function saveConfig(config: ClawmonConfig): Promise<void> {
 // --- Clawmon CRUD ---
 
 export async function saveClawmon(clawmon: Clawmon): Promise<void> {
+  await initMemoryRoot();
   const dir = clawmonDir(clawmon.id);
   await mkdir(dir, { recursive: true });
   await mkdir(memoryDir(clawmon.id), { recursive: true });
@@ -122,6 +151,7 @@ export async function findClawmonByName(name: string): Promise<Clawmon | null> {
 // --- Memory ---
 
 export async function saveMemory(clawmonId: string, entry: MemoryEntry): Promise<void> {
+  await initMemoryRoot();
   const dir = memoryDir(clawmonId);
   await mkdir(dir, { recursive: true });
 
@@ -136,6 +166,7 @@ export async function saveMemory(clawmonId: string, entry: MemoryEntry): Promise
 name: ${entry.name}
 description: ${entry.description}
 type: ${entry.type}
+tags: [clawmon, ${clawmonId}, ${entry.type}]
 createdAt: ${entry.createdAt}
 updatedAt: ${entry.updatedAt}
 ---
@@ -159,6 +190,7 @@ ${entry.content}
 }
 
 export async function loadMemories(clawmonId: string): Promise<MemoryEntry[]> {
+  await initMemoryRoot();
   const dir = memoryDir(clawmonId);
   if (!existsSync(dir)) return [];
 

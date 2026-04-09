@@ -165,6 +165,16 @@ Memory is the hard problem. Clawmon uses file-based storage with typed entries -
 
 Each memory has a type (`observation`, `pattern`, `preference`, `fact`, `goal`, `insight`), a creation date, and plain-text content. The clawmon decides when to save -- you just talk naturally.
 
+### Obsidian Integration
+
+Memory files are markdown with YAML frontmatter and tags -- already Obsidian-compatible. Point clawmon at your vault and memories show up as navigable, searchable, graph-linked notes alongside your own:
+
+```bash
+clawmon config memoryRoot /path/to/your/obsidian-vault/clawmon
+```
+
+No Obsidian? No problem. Memories default to `~/.clawmon/` and work the same way.
+
 See [MEMORY-DESIGN.md](MEMORY-DESIGN.md) for the full design: what gets stored, what gets summarized, what gets forgotten, and how memory stays useful instead of decaying into noise.
 
 ## Safety and Behavior Boundaries
@@ -249,6 +259,11 @@ clawmon skills penny                    # see available skills
 # Portability
 clawmon export penny                    # export to JSON
 clawmon import penny.json               # import from JSON
+
+# Config
+clawmon config                          # view current settings
+clawmon config memoryRoot /path/to/vault  # set Obsidian vault path
+clawmon config memoryRoot reset         # reset to default
 
 # Debug
 clawmon --debug "@penny hello"          # verbose output for troubleshooting
