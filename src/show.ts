@@ -3,7 +3,7 @@ import type { Clawmon } from './types.js';
 import { RARITY_STARS } from './types.js';
 import { getRole } from './roles.js';
 import { renderSprite } from './sprites/render.js';
-import { loadMemories } from './memory/store.js';
+import { loadMemories, hasPortrait, portraitPath } from './memory/store.js';
 
 const RARITY_COLOR: Record<string, (s: string) => string> = {
   common: chalk.white,
@@ -98,6 +98,11 @@ export async function showClawmon(clawmon: Clawmon): Promise<void> {
 
   // Footer: notes + interactions
   console.log(chalk.dim(`  Notes: ${memories.length}  |  Interactions: ${clawmon.interactions}  |  Hatched: ${clawmon.hatchedAt.split('T')[0]}`));
+
+  // Portrait path if one exists
+  if (hasPortrait(clawmon.id)) {
+    console.log(chalk.dim(`  Portrait: ${portraitPath(clawmon.id)}`));
+  }
   console.log();
 }
 

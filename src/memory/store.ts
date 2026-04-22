@@ -233,6 +233,43 @@ export async function findClawmonByName(name: string): Promise<Clawmon | null> {
   ) ?? null;
 }
 
+// --- Portrait ---
+
+/** Path to a clawmon's portrait image. Always in the canonical location (~/.clawmon/) regardless of memoryRoot. */
+export function portraitPath(id: string): string {
+  return join(clawmonDir(id), 'portrait.png');
+}
+
+/** Whether a clawmon has a saved portrait image. */
+export function hasPortrait(id: string): boolean {
+  return existsSync(portraitPath(id));
+}
+
+/**
+ * Save a portrait image from a source file path or a Buffer, and mirror it to the
+ * Obsidian vault if a custom memoryRoot is configured.
+ */
+export async function savePortrait(clawmon: Clawmon, imageSource: string | Buffer): Promise<void> {
+  await initMemoryRoot();
+  const destCanonical = portraitPath(clawmon.id);
+  await mkdir(clawmonDir(clawmon.id), { recursive: true });
+
+  if (typeof imageSource === 'string') {
+    const { copyFile } = await import('node:fs/promises');
+    await copyFile(imageSource, destCanonical);
+  } else {
+    await writeFile(destCanonical, imageSource);
+  }
+
+  // Mirror to vault if one is configured
+  if (_memoryRootCache) {
+    const vaultDest = join(memoryDir(clawmon.id, clawmon.familyName), 'portrait.png');
+    await mkdir(memoryDir(clawmon.id, clawmon.familyName), { recursive: true });
+    const { copyFile } = await import('node:fs/promises');
+    await copyFile(destCanonical, vaultDest);
+  }
+}
+
 // --- Unique ID generation ---
 
 /**

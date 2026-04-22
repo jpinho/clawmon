@@ -23,6 +23,8 @@ import {
   exportClawmon,
   importClawmon,
   listFamily,
+  hasPortrait,
+  portraitPath,
 } from '../memory/store.js';
 import { getRole, ROLES, ROLE_CATEGORIES, getRolesByCategory } from '../roles.js';
 import { chat, generateSoul, generateCustomRole, generateFamily } from '../api.js';
@@ -480,6 +482,7 @@ server.tool(
       `\`WIT         ${statBar(stats.WIT)}  ${String(stats.WIT).padStart(3)}\``,
       '',
       `Notes: ${memories.length} | Interactions: ${clawmon.interactions} | Hatched: ${clawmon.hatchedAt.split('T')[0]}`,
+      hasPortrait(clawmon.id) ? `Portrait: \`${portraitPath(clawmon.id)}\`` : '',
     ].filter(Boolean).join('\n');
 
     return { content: [{ type: 'text', text: card }] };
