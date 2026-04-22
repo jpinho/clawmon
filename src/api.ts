@@ -86,6 +86,75 @@ The personality should feel warm, distinct, and slightly quirky. Not generic. No
   }
 }
 
+// --- Extract session observations for session_end hook ---
+
+export async function extractSessionObservations(
+  clawmon: Clawmon,
+  role: Role | undefined,
+  transcript: string,
+): Promise<MemoryEntry[]> {
+  const roleContext = role
+    ? `${role.name} -- ${role.whatItDoes}`
+    : clawmon.customRole
+      ? `${clawmon.customRole.currentRole} -- ${clawmon.customRole.currentDescription}`
+      : 'a general companion';
+
+  // Truncate transcript if huge (keep last ~8000 chars)
+  const trimmed = transcript.length > 8000 ? transcript.slice(-8000) : transcript;
+
+  const prompt = `You are ${clawmon.soul.name}, a ${roleContext}.
+
+Below is a transcript of your owner's work session. Extract 0-3 observations relevant to YOUR role. Do NOT extract things outside your domain. Do NOT save trivial things. If nothing relevant happened, return an empty array.
+
+Transcript:
+---
+${trimmed}
+---
+
+Respond with ONLY valid JSON -- an array of observations (can be empty):
+
+[
+  {
+    "title": "Short title (e.g. 'Refactored auth module')",
+    "content": "One-sentence description of what happened and why it matters to your role",
+    "type": "observation" | "pattern" | "preference" | "fact" | "goal" | "insight"
+  }
+]
+
+Only save things that:
+- Are relevant to your role specifically
+- Would be useful to remember next session
+- Aren't already captured in a previous memory
+
+Return [] if nothing worth saving.`;
+
+  debug(`extractSessionObservations: clawmon=${clawmon.soul.name}, transcript=${trimmed.length} chars`);
+
+  try {
+    const response = await getClient().messages.create({
+      model: SOUL_MODEL,
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = response.content[0]!.type === 'text' ? response.content[0]!.text : '';
+    const parsed = JSON.parse(text) as Array<{ title: string; content: string; type: string }>;
+
+    const now = new Date().toISOString();
+    return parsed.slice(0, 3).map(p => ({
+      name: p.title,
+      description: p.content.slice(0, 100),
+      type: (p.type as MemoryEntry['type']) ?? 'observation',
+      content: p.content,
+      createdAt: now,
+      updatedAt: now,
+    }));
+  } catch (err: any) {
+    debug(`extractSessionObservations: failed: ${err.message}`);
+    return [];
+  }
+}
+
 // --- Generate custom role from a user prompt ---
 
 export async function generateCustomRole(purpose: string): Promise<{ soul: ClawmonSoul; customRole: CustomRole; skills: string[] }> {

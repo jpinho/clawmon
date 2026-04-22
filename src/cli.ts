@@ -21,6 +21,9 @@ import {
   exportClawmon,
   importClawmon,
   saveClawmon,
+  loadClawmon,
+  loadFeelings,
+  saveMemory,
 } from './memory/store.js';
 import { hatchClawmon, suggestRoles, displayRoleSuggestions, rollBones } from './hatch.js';
 import { talkToClawmon, replWithClawmon } from './talk.js';
@@ -28,7 +31,7 @@ import { showClawmon } from './show.js';
 import { renderSprite, renderFace } from './sprites/render.js';
 import { getRole, ROLES, ROLE_CATEGORIES, getRolesByCategory } from './roles.js';
 import { listAvailableSkills, createSkillRegistry } from './skills/registry.js';
-import { chat, generateSoul, generateCustomRole, generateFamily } from './api.js';
+import { chat, generateSoul, generateCustomRole, generateFamily, extractSessionObservations } from './api.js';
 import { debug as dbg } from './debug.js';
 import { RARITY_STARS } from './types.js';
 import type { Clawmon } from './types.js';
@@ -583,6 +586,194 @@ program
     }
   });
 
+// --- primary ---
+
+program
+  .command('primary [name]')
+  .description('Set or view the primary clawmon -- the one that greets + observes sessions')
+  .action(async (name?: string) => {
+    if (!isInitialized()) await initClawmonDir();
+    const config = await loadConfig();
+
+    if (!name) {
+      const currentId = config.primaryClawmon ?? config.clawmons[0];
+      if (!currentId) {
+        console.log(chalk.dim('  No clawmons yet. Run: clawmon hatch'));
+        return;
+      }
+      const clawmon = await loadClawmon(currentId);
+      console.log();
+      console.log(chalk.bold(`  Primary: ${clawmon?.soul.name ?? currentId}`));
+      console.log(chalk.dim(`  This clawmon greets you at session start and observes what happens.`));
+      console.log(chalk.dim(`  Change with: clawmon primary <name>`));
+      console.log();
+      return;
+    }
+
+    const clawmon = await findClawmonByName(name);
+    if (!clawmon) {
+      console.log(chalk.red(`  Clawmon "${name}" not found.`));
+      return;
+    }
+
+    config.primaryClawmon = clawmon.id;
+    await saveConfig(config);
+    console.log(chalk.green(`  ${clawmon.soul.name} is now your primary companion.`));
+  });
+
+// --- session-start ---
+
+program
+  .command('session-start')
+  .description('Output context for Claude Code session start (used via settings.json hook)')
+  .action(async () => {
+    if (!isInitialized()) return; // silent: no init, no output
+
+    const config = await loadConfig();
+    const id = config.primaryClawmon ?? config.clawmons[0];
+    if (!id) return;
+
+    const clawmon = await loadClawmon(id);
+    if (!clawmon) return;
+
+    const role = getRole(clawmon.roleId);
+    const roleName = clawmon.customRole?.currentRole ?? role?.name ?? 'Companion';
+    const memories = await loadMemories(clawmon.id);
+    const feelings = await loadFeelings(clawmon.id);
+
+    // Prioritize goals, then preferences, then recent observations
+    const goals = memories.filter(m => m.type === 'goal');
+    const preferences = memories.filter(m => m.type === 'preference');
+    const recent = memories
+      .filter(m => m.type !== 'goal' && m.type !== 'preference')
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 3);
+
+    const daysSinceHatch = Math.floor((Date.now() - new Date(clawmon.hatchedAt).getTime()) / 86400000);
+
+    const lines: string[] = [];
+    // Summary header -- tells the session what's being loaded at a glance
+    const summaryParts = [`${goals.length} goal${goals.length === 1 ? '' : 's'}`];
+    summaryParts.push(`${preferences.length} preference${preferences.length === 1 ? '' : 's'}`);
+    summaryParts.push(`${recent.length} recent observation${recent.length === 1 ? '' : 's'}`);
+    summaryParts.push(`mood ${feelings.mood}/10`);
+    summaryParts.push(`${clawmon.interactions} interactions`);
+
+    lines.push(`## Clawmon session context`);
+    lines.push(`Loading **${clawmon.soul.name}** (${roleName}): ${summaryParts.join(' · ')}`);
+    lines.push('');
+    lines.push(`*"${clawmon.soul.catchphrase}"*`);
+    lines.push('');
+    lines.push(`**Status:** confidence ${feelings.confidence}/10, ${feelings.trend} over ${daysSinceHatch} days`);
+    lines.push('');
+
+    if (goals.length > 0) {
+      lines.push('**Active goals:**');
+      for (const g of goals) lines.push(`- ${g.content}`);
+      lines.push('');
+    }
+
+    if (preferences.length > 0) {
+      lines.push('**Preferences:**');
+      for (const p of preferences) lines.push(`- ${p.content}`);
+      lines.push('');
+    }
+
+    if (recent.length > 0) {
+      lines.push('**Recent observations:**');
+      for (const r of recent) lines.push(`- [${r.type}] ${r.content}`);
+      lines.push('');
+    }
+
+    if (goals.length === 0 && preferences.length === 0 && recent.length === 0) {
+      lines.push(`*No memories yet. ${clawmon.soul.name} is a clean slate.*`);
+    }
+
+    const context = lines.join('\n');
+
+    // Output in Claude Code's JSON format for reliable context injection
+    const output = {
+      hookSpecificOutput: {
+        hookEventName: 'SessionStart',
+        additionalContext: context,
+      },
+    };
+    console.log(JSON.stringify(output));
+  });
+
+// --- session-end ---
+
+async function readStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    let data = '';
+    process.stdin.setEncoding('utf-8');
+    process.stdin.on('data', (chunk) => { data += chunk; });
+    process.stdin.on('end', () => resolve(data));
+    // Fall back to empty string if no stdin (e.g. manual invocation)
+    setTimeout(() => resolve(data), 500);
+  });
+}
+
+program
+  .command('session-end [transcript-path]')
+  .description('Extract observations from a Claude Code session transcript (used via SessionEnd hook -- reads JSON from stdin with transcript_path)')
+  .action(async (transcriptPath?: string) => {
+    if (!isInitialized()) return;
+
+    // Resolve transcript path: hook sends JSON on stdin with `transcript_path`,
+    // but CLI invocations can pass it as an argument.
+    let resolvedPath = transcriptPath;
+    if (!resolvedPath && !process.stdin.isTTY) {
+      try {
+        const stdin = await readStdin();
+        if (stdin.trim().startsWith('{')) {
+          const payload = JSON.parse(stdin);
+          resolvedPath = payload.transcript_path;
+        }
+      } catch (err) {
+        dbg(`session-end: failed to parse stdin: ${err}`);
+      }
+    }
+
+    if (!resolvedPath) {
+      dbg('session-end: no transcript path provided');
+      return;
+    }
+
+    const config = await loadConfig();
+    const id = config.primaryClawmon ?? config.clawmons[0];
+    if (!id) return;
+
+    const clawmon = await loadClawmon(id);
+    if (!clawmon) return;
+
+    let transcript: string;
+    try {
+      transcript = await readFile(resolvedPath, 'utf-8');
+    } catch (err) {
+      dbg(`session-end: failed to read transcript: ${err}`);
+      return;
+    }
+
+    if (transcript.length < 200) {
+      dbg('session-end: transcript too short, skipping');
+      return;
+    }
+
+    const role = getRole(clawmon.roleId);
+
+    try {
+      const observations = await extractSessionObservations(clawmon, role, transcript);
+      for (const obs of observations) {
+        await saveMemory(clawmon.id, obs);
+      }
+      dbg(`session-end: saved ${observations.length} observations for ${clawmon.soul.name}`);
+      // Silent by default -- hook should not produce noise unless in debug mode
+    } catch (err) {
+      dbg(`session-end: failed: ${err}`);
+    }
+  });
+
 // --- shuffle ---
 
 program
@@ -656,7 +847,8 @@ program
 // --- Routing: known command vs natural language ---
 
 const knownCommands = new Set([
-  'init', 'config', 'hatch', 'spawn', 'spawn-family', 'talk-family',
+  'init', 'config', 'primary', 'session-start', 'session-end',
+  'hatch', 'spawn', 'spawn-family', 'talk-family',
   'talk', 'chat', 'roles', 'show', 'notes', 'shuffle',
   'family', 'list', 'export', 'import', 'help', 'skills',
   '-V', '--version', '-h', '--help',

@@ -1,0 +1,29 @@
+{
+  "_comment": "Add the hooks block below to ~/.claude/settings.json. Adjust paths to your checkout location. The matcher field controls WHEN the hook fires (e.g. on fresh startup, on resume, etc).",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /ABSOLUTE/PATH/TO/clawmon && NODE_NO_WARNINGS=1 npx tsx src/index.ts session-start",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "clear|logout|prompt_input_exit|other",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "NODE_NO_WARNINGS=1 npx tsx /ABSOLUTE/PATH/TO/clawmon/src/index.ts session-end",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

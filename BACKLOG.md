@@ -66,23 +66,13 @@ The gap is now **first-run experience and packaging**. The system works -- but a
 
 ## P0: MVP Blockers
 
-### 1. Proactive Session Greeting
-**Est: 3-4h** | The single most important missing feature
+### 1. ~~Proactive Session Greeting~~ ✅ Shipped
 
-When you start a terminal session, your active clawmons should greet you unprompted. The Best Friend says "Morning! You were up late last night." The Financial Advisor says "Your savings goal is 74% on track." This is what makes them feel alive.
+`clawmon session-start` outputs the primary companion's context in Claude Code's hook JSON format. Instant (file reads only). Hook config in `skills/claude-code-hooks/`.
 
-- Session hook: `session_start` triggers greeting from active clawmons
-- Each clawmon's greeting is informed by their role + recent memories + feelings
-- Configurable: which clawmons greet on start, which stay quiet
+### 2. ~~Session End Note Collection~~ ✅ Shipped
 
-### 2. Session End Note Collection
-**Est: 2-3h**
-
-When a terminal session ends, clawmons should scan what happened and save relevant observations. The Career Coach notes "Owner worked on infrastructure all day." The Sleep Guardian notes "Session ended at 1:30 AM."
-
-- Session hook: `session_end` triggers note collection
-- Each active clawmon runs a brief observation extraction
-- Notes saved to their memory partition
+`clawmon session-end` reads Claude Code transcript from stdin, extracts 0-3 observations via Sonnet, saves them as typed memories. Silent by default.
 
 ### 3. npm Package + Global Install
 **Est: 2-3h**
@@ -250,15 +240,15 @@ When a companion's purpose is complete, its accumulated knowledge should be tran
 | Claude Code skill | Done | -- |
 | Demo GIFs | Done | -- |
 | Design docs + test suite | Done | -- |
-| Session greeting | Missing | **P0 blocker** (#1) |
-| Session end notes | Missing | **P0 blocker** (#2) |
+| Session greeting | Done | `clawmon session-start` + Claude Code hooks |
+| Session end notes | Done | `clawmon session-end` + Claude Code hooks |
 | Global install (`npm i -g clawmon`) | Missing | **P0 blocker** (#3) |
 | Onboarding | Missing | **P0 blocker** (#4) |
 | Conversation quality | Partial | System prompt tuning (#5) |
 
-**Estimated time to MVP: 12-16 hours of focused work.**
+**Estimated time to MVP: 6-9 hours of focused work.**
 
-The 5 P0 items total ~12-15h. The system underneath is solid -- what's missing is packaging and the first-minute experience.
+Session hooks (the biggest gap) are shipped. Remaining P0: npm packaging, onboarding flow, conversation quality tuning.
 
 ### What Makes It Worth Sharing
 

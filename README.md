@@ -224,9 +224,26 @@ Skills are constrained by role. A Financial Advisor gets `calculator` + `web_sea
   save_note     -- remember important things about you
 ```
 
-## Proactive Behavior (Coming Soon)
+## Proactive Behavior
 
-Agents that don't wait for you to talk. They work toward your goals on a schedule.
+Clawmons shouldn't wait for you to remember them. With Claude Code hooks, your primary companion shows up automatically.
+
+### Session hooks
+
+**SessionStart** -- your primary clawmon's context (role, feelings, active goals, recent observations) is automatically injected when you open Claude Code. No AI call. Instant.
+
+**SessionEnd** -- when you close Claude Code, your primary clawmon reads the transcript and extracts relevant observations, saving them as memories. One cheap Sonnet call, happens in the background.
+
+```bash
+# Pick which clawmon greets and observes
+clawmon primary penny
+
+# Add hooks to ~/.claude/settings.json (see skills/claude-code-hooks/)
+```
+
+Full setup in [skills/claude-code-hooks/](skills/claude-code-hooks/README.md).
+
+### Scheduled behavior (coming soon)
 
 <div align="center">
 
@@ -306,6 +323,12 @@ clawmon import penny.json               # import from JSON
 clawmon config                          # view current settings
 clawmon config memoryRoot /path/to/vault  # set Obsidian vault path
 clawmon config memoryRoot reset         # reset to default
+clawmon primary                         # view primary clawmon
+clawmon primary penny                   # set primary (greets + observes sessions)
+
+# Session hooks (called by Claude Code automatically -- see skills/claude-code-hooks/)
+clawmon session-start                   # outputs primary clawmon's context
+clawmon session-end                     # extracts observations from transcript
 
 # Debug
 clawmon --debug "@penny hello"          # verbose output for troubleshooting
