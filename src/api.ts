@@ -99,51 +99,79 @@ export async function extractSessionObservations(
       ? `${clawmon.customRole.currentRole} -- ${clawmon.customRole.currentDescription}`
       : 'a general companion';
 
-  // Truncate transcript if huge (keep last ~8000 chars)
-  const trimmed = transcript.length > 8000 ? transcript.slice(-8000) : transcript;
+  // Keep both the start (intent/setup) and end (outcome) of the transcript.
+  // Long sessions have important context in both places.
+  const MAX_HEAD = 4000;
+  const MAX_TAIL = 12000;
+  let trimmed: string;
+  if (transcript.length <= MAX_HEAD + MAX_TAIL) {
+    trimmed = transcript;
+  } else {
+    trimmed = transcript.slice(0, MAX_HEAD) + '\n\n[... middle of session truncated ...]\n\n' + transcript.slice(-MAX_TAIL);
+  }
 
-  const prompt = `You are ${clawmon.soul.name}, a ${roleContext}.
+  const prompt = `You are ${clawmon.soul.name} -- ${roleContext}.
 
-Below is a transcript of your owner's work session. Extract 0-3 observations relevant to YOUR role. Do NOT extract things outside your domain. Do NOT save trivial things. If nothing relevant happened, return an empty array.
+Below is the transcript of your owner's work session. Your job is to extract memory that will make NEXT session more useful, not just to log what happened.
+
+A good memory pass produces:
+1. ONE session summary that captures the arc -- what was the user trying to do, what was the throughline, what shifted, where did they land. This goes as a single "insight" type entry titled "Session: <YYYY-MM-DD> -- <one-line theme>" with a multi-paragraph content body covering: intent, key decisions, surprises/pivots, and the state at session end.
+2. 2-5 specific observations -- concrete facts, decisions, patterns, or open threads worth remembering. Each should be useful when surfaced in a later session, not a generic event log.
+
+Rules:
+- The session summary is the MOST IMPORTANT entry. Make it readable narrative, not bullet points. 3-6 sentences.
+- Specific observations should be concrete: a decision made, a system fact discovered, an unfinished thread, a recurring pattern.
+- Use type "goal" for unfinished work the user explicitly said they'd resume.
+- Use type "fact" for system/project state worth remembering (versions, configs, paths, names).
+- Use type "insight" for the session summary AND for cross-cutting realizations.
+- Use type "pattern" for behavior or preference patterns observed across the session.
+- Use type "observation" for sparingly -- only when nothing else fits.
+- Skip trivia, small talk, file paths that don't matter. Don't save what's already obvious from the project state.
+- For YOU (a primary "personal operations intelligence" companion), take a wide view -- you're the user's session-spanning memory across whatever they work on.
 
 Transcript:
 ---
 ${trimmed}
 ---
 
-Respond with ONLY valid JSON -- an array of observations (can be empty):
+Respond with ONLY valid JSON -- an array of memory entries:
 
 [
   {
-    "title": "Short title (e.g. 'Refactored auth module')",
-    "content": "One-sentence description of what happened and why it matters to your role",
-    "type": "observation" | "pattern" | "preference" | "fact" | "goal" | "insight"
+    "title": "Short title (e.g. 'Session: 2026-04-22 -- pivoted from backfill to sync prune' or 'Resumed prune helper implementation')",
+    "content": "Full content. For session summaries, write 3-6 sentences of narrative. For observations, be specific and self-contained.",
+    "type": "insight" | "goal" | "fact" | "pattern" | "observation"
   }
 ]
 
-Only save things that:
-- Are relevant to your role specifically
-- Would be useful to remember next session
-- Aren't already captured in a previous memory
-
-Return [] if nothing worth saving.`;
+Aim for 3-6 entries total: one session summary (insight) + 2-5 specific observations. If almost nothing happened, return just the summary plus 1-2 observations. If genuinely nothing of value, return [].`;
 
   debug(`extractSessionObservations: clawmon=${clawmon.soul.name}, transcript=${trimmed.length} chars`);
 
   try {
     const response = await getClient().messages.create({
-      model: SOUL_MODEL,
-      max_tokens: 1500,
+      model: CHAT_MODEL, // Use Opus for richer extraction -- this runs once per session
+      max_tokens: 10000,
       messages: [{ role: 'user', content: prompt }],
     });
 
     const text = response.content[0]!.type === 'text' ? response.content[0]!.text : '';
-    const parsed = JSON.parse(text) as Array<{ title: string; content: string; type: string }>;
+
+    // Be tolerant of the model adding ```json ... ``` fencing or preamble.
+    // Find the outermost JSON array.
+    const arrayStart = text.indexOf('[');
+    const arrayEnd = text.lastIndexOf(']');
+    if (arrayStart === -1 || arrayEnd <= arrayStart) {
+      debug('extractSessionObservations: no JSON array found in response');
+      return [];
+    }
+    const jsonText = text.slice(arrayStart, arrayEnd + 1);
+    const parsed = JSON.parse(jsonText) as Array<{ title: string; content: string; type: string }>;
 
     const now = new Date().toISOString();
-    return parsed.slice(0, 3).map(p => ({
+    return parsed.slice(0, 12).map(p => ({
       name: p.title,
-      description: p.content.slice(0, 100),
+      description: p.content.slice(0, 200),
       type: (p.type as MemoryEntry['type']) ?? 'observation',
       content: p.content,
       createdAt: now,
