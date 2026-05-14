@@ -72,7 +72,7 @@ The gap is now **first-run experience and packaging**. The system works -- but a
 
 ### 2. ~~Session End Note Collection~~ ✅ Shipped
 
-`clawmon session-end` reads Claude Code transcript from stdin, extracts 0-3 observations via Sonnet, saves them as typed memories. Silent by default.
+`clawmon session-end` reads Claude Code transcript from stdin, saves one rich structured session memory plus specific follow-up/fact memories, and prints saved file links for verification.
 
 ### 3. npm Package + Global Install
 **Est: 2-3h**

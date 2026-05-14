@@ -115,10 +115,12 @@ export interface ClawmonConfig {
 
 // --- Memory ---
 
+export type MemoryType = 'session' | 'observation' | 'pattern' | 'preference' | 'fact' | 'goal' | 'insight';
+
 export interface MemoryEntry {
   name: string;
   description: string;
-  type: 'observation' | 'pattern' | 'preference' | 'fact' | 'goal' | 'insight';
+  type: MemoryType;
   content: string;
   createdAt: string;
   updatedAt: string;

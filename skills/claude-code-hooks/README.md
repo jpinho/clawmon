@@ -13,7 +13,7 @@ This makes clawmons **proactive**: your primary companion automatically greets y
 
 Claude Code injects this as session context, so it already knows what your clawmon knows when you start working.
 
-**SessionEnd hook** -- runs when Claude Code closes a session. Reads the transcript, calls Sonnet once to extract 0-3 observations relevant to your primary clawmon's role, and saves them as memories. Silent -- you won't notice it running.
+**SessionEnd hook** -- runs when Claude Code closes a session. Reads the transcript, calls the model once to save a rich Obsidian session note with Context, Problems Being Solved, Solutions Worked On, Follow-up, and Notes, plus a few specific follow-up/fact memories. It prints the saved memory file links so you can verify the note immediately.
 
 ## Setup
 
@@ -51,7 +51,7 @@ Edit your settings file and add this block (replace `/ABSOLUTE/PATH/TO/clawmon` 
           {
             "type": "command",
             "command": "NODE_NO_WARNINGS=1 npx tsx /ABSOLUTE/PATH/TO/clawmon/src/index.ts session-end",
-            "timeout": 30
+            "timeout": 90
           }
         ]
       }

@@ -310,7 +310,7 @@ export function generateFamilyIdentity(purpose: string): { familyId: string; fam
 
 // --- Memory ---
 
-export async function saveMemory(clawmonId: string, entry: MemoryEntry): Promise<void> {
+export async function saveMemory(clawmonId: string, entry: MemoryEntry): Promise<string> {
   await initMemoryRoot();
   const dir = memoryDir(clawmonId);
   await mkdir(dir, { recursive: true });
@@ -323,8 +323,8 @@ export async function saveMemory(clawmonId: string, entry: MemoryEntry): Promise
     .slice(0, 60) + '.md';
 
   const content = `---
-name: ${entry.name}
-description: ${entry.description}
+name: ${yamlString(entry.name)}
+description: ${yamlString(entry.description)}
 type: ${entry.type}
 tags: [clawmon, ${clawmonId}, ${entry.type}]
 createdAt: ${entry.createdAt}
@@ -334,7 +334,8 @@ updatedAt: ${entry.updatedAt}
 ${entry.content}
 `;
 
-  await writeFile(join(dir, filename), content);
+  const memoryPath = join(dir, filename);
+  await writeFile(memoryPath, content);
 
   // Update MEMORY.md index
   const indexPath = join(dir, 'MEMORY.md');
@@ -347,6 +348,8 @@ ${entry.content}
     lines.push(entryLine);
     await writeFile(indexPath, lines.join('\n'));
   }
+
+  return memoryPath;
 }
 
 export async function loadMemories(clawmonId: string): Promise<MemoryEntry[]> {
@@ -382,7 +385,7 @@ function parseFrontmatter(content: string): MemoryEntry | null {
     const colonIdx = line.indexOf(':');
     if (colonIdx > 0) {
       const key = line.slice(0, colonIdx).trim();
-      const value = line.slice(colonIdx + 1).trim();
+      const value = parseFrontmatterValue(line.slice(colonIdx + 1).trim());
       fields[key] = value;
     }
   }
@@ -395,6 +398,21 @@ function parseFrontmatter(content: string): MemoryEntry | null {
     createdAt: fields['createdAt'] ?? new Date().toISOString(),
     updatedAt: fields['updatedAt'] ?? new Date().toISOString(),
   };
+}
+
+function yamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+function parseFrontmatterValue(value: string): string {
+  if (value.startsWith('"')) {
+    try {
+      return JSON.parse(value) as string;
+    } catch {
+      return value;
+    }
+  }
+  return value;
 }
 
 // --- Feelings ---

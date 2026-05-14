@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ClawmonBones, ClawmonSoul, Clawmon, MemoryEntry, CustomRole } from './types.js';
+import type { ClawmonBones, ClawmonSoul, Clawmon, MemoryEntry, MemoryType, CustomRole } from './types.js';
 import type { Role } from './roles.js';
 import { RARITY_STARS } from './types.js';
 import { createSkillRegistry } from './skills/registry.js';
@@ -99,33 +99,45 @@ export async function extractSessionObservations(
       ? `${clawmon.customRole.currentRole} -- ${clawmon.customRole.currentDescription}`
       : 'a general companion';
 
-  // Keep both the start (intent/setup) and end (outcome) of the transcript.
-  // Long sessions have important context in both places.
-  const MAX_HEAD = 4000;
-  const MAX_TAIL = 12000;
-  let trimmed: string;
-  if (transcript.length <= MAX_HEAD + MAX_TAIL) {
-    trimmed = transcript;
-  } else {
-    trimmed = transcript.slice(0, MAX_HEAD) + '\n\n[... middle of session truncated ...]\n\n' + transcript.slice(-MAX_TAIL);
-  }
+  const trimmed = buildTranscriptExcerpt(transcript);
+  const sessionTimestamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
 
   const prompt = `You are ${clawmon.soul.name} -- ${roleContext}.
 
-Below is the transcript of your owner's work session. Your job is to extract memory that will make NEXT session more useful, not just to log what happened.
+Below is the transcript of your owner's work session. Extract memory that will make the NEXT session useful. Do not write a thin activity log.
 
-A good memory pass produces:
-1. ONE session summary that captures the arc -- what was the user trying to do, what was the throughline, what shifted, where did they land. This goes as a single "insight" type entry titled "Session: <YYYY-MM-DD> -- <one-line theme>" with a multi-paragraph content body covering: intent, key decisions, surprises/pivots, and the state at session end.
-2. 2-5 specific observations -- concrete facts, decisions, patterns, or open threads worth remembering. Each should be useful when surfaced in a later session, not a generic event log.
+The first memory is mandatory unless the transcript contains no meaningful work:
+1. ONE rich session note with type "session" and title "Session: ${sessionTimestamp} -- <specific theme>".
+2. The session note must have clear markdown sections:
+   ## Context
+   ## Problems Being Solved
+   ## Solutions Worked On
+   ## Follow-up
+   ## Notes
+3. Each section should be descriptive and self-contained. Prefer concrete repos, branches, files, PR/MR numbers, commands, decisions, failures, validation status, and unresolved questions when visible.
+
+Then add 2-6 smaller atomic memories:
+- goals for concrete follow-up or unfinished work
+- facts for durable project/system state
+- patterns for recurring owner behavior/preferences
+- insights for cross-cutting lessons
+- observations only when nothing else fits
 
 Rules:
-- The session summary is the MOST IMPORTANT entry. Make it readable narrative, not bullet points. 3-6 sentences.
-- Specific observations should be concrete: a decision made, a system fact discovered, an unfinished thread, a recurring pattern.
+- The session note is the MOST IMPORTANT entry. It should be long enough that a future agent can resume without reading the raw transcript.
+- Do not collapse everything into one paragraph. Use the required section headings.
+- "Context" explains why the session happened, which project/repo/branch it concerned, and the user intent.
+- "Problems Being Solved" lists the actual problems, bugs, review feedback, design questions, or workflow issues.
+- "Solutions Worked On" describes approaches tried, files/modules touched, decisions made, and verification performed or skipped.
+- "Follow-up" lists concrete next actions, open questions, owner commitments, or blocked verification.
+- "Notes" captures useful side observations, communication preferences, team dynamics, tool reliability, or constraints.
 - Use type "goal" for unfinished work the user explicitly said they'd resume.
 - Use type "fact" for system/project state worth remembering (versions, configs, paths, names).
-- Use type "insight" for the session summary AND for cross-cutting realizations.
+- Use type "session" only for the rich session note.
+- Use type "insight" for cross-cutting realizations.
 - Use type "pattern" for behavior or preference patterns observed across the session.
 - Use type "observation" for sparingly -- only when nothing else fits.
+- Avoid duplicate stale "prior goals unchanged" memories unless the session explicitly revalidated them.
 - Skip trivia, small talk, file paths that don't matter. Don't save what's already obvious from the project state.
 - For YOU (a primary "personal operations intelligence" companion), take a wide view -- you're the user's session-spanning memory across whatever they work on.
 
@@ -134,17 +146,28 @@ Transcript:
 ${trimmed}
 ---
 
-Respond with ONLY valid JSON -- an array of memory entries:
+Respond with ONLY valid JSON -- an array of memory entries. Use this shape:
 
 [
   {
-    "title": "Short title (e.g. 'Session: 2026-04-22 -- pivoted from backfill to sync prune' or 'Resumed prune helper implementation')",
-    "content": "Full content. For session summaries, write 3-6 sentences of narrative. For observations, be specific and self-contained.",
-    "type": "insight" | "goal" | "fact" | "pattern" | "observation"
+    "title": "Session: ${sessionTimestamp} -- specific theme",
+    "description": "One or two sentences summarizing the session outcome and current state.",
+    "type": "session",
+    "context": ["..."],
+    "problems": ["..."],
+    "solutions": ["..."],
+    "followUp": ["..."],
+    "notes": ["..."]
+  },
+  {
+    "title": "Short standalone memory title",
+    "description": "One sentence summary.",
+    "content": "Detailed memory content. Use 2-5 sentences or concise bullets. It must be understandable without the session note.",
+    "type": "goal" | "fact" | "pattern" | "insight" | "observation"
   }
 ]
 
-Aim for 3-6 entries total: one session summary (insight) + 2-5 specific observations. If almost nothing happened, return just the summary plus 1-2 observations. If genuinely nothing of value, return [].`;
+Aim for 3-7 entries total: one rich session note + 2-6 specific memories. If almost nothing happened, return just the session note plus 1 specific memory. If genuinely nothing of value happened, return [].`;
 
   debug(`extractSessionObservations: clawmon=${clawmon.soul.name}, transcript=${trimmed.length} chars`);
 
@@ -166,21 +189,119 @@ Aim for 3-6 entries total: one session summary (insight) + 2-5 specific observat
       return [];
     }
     const jsonText = text.slice(arrayStart, arrayEnd + 1);
-    const parsed = JSON.parse(jsonText) as Array<{ title: string; content: string; type: string }>;
+    const parsed = JSON.parse(jsonText) as SessionObservationResponse[];
 
     const now = new Date().toISOString();
-    return parsed.slice(0, 12).map(p => ({
-      name: p.title,
-      description: p.content.slice(0, 200),
-      type: (p.type as MemoryEntry['type']) ?? 'observation',
-      content: p.content,
-      createdAt: now,
-      updatedAt: now,
-    }));
+    return parsed.slice(0, 8).map((p, index) => {
+      const type = normalizeMemoryType(p.type, index);
+      const content = buildMemoryContent(p, type);
+      return {
+        name: p.title?.trim() || (type === 'session' ? `Session: ${sessionTimestamp} -- work session` : 'Untitled memory'),
+        description: p.description?.trim() || summarizeContent(content),
+        type,
+        content,
+        createdAt: now,
+        updatedAt: now,
+      };
+    }).filter(m => m.content.trim().length > 0);
   } catch (err: any) {
     debug(`extractSessionObservations: failed: ${err.message}`);
     return [];
   }
+}
+
+type SessionObservationResponse = {
+  title?: string;
+  description?: string;
+  type?: string;
+  content?: string;
+  context?: string | string[];
+  problems?: string | string[];
+  solutions?: string | string[];
+  followUp?: string | string[];
+  notes?: string | string[];
+};
+
+function buildTranscriptExcerpt(transcript: string): string {
+  // Preserve intent, middle decisions, and final state without sending huge logs.
+  const MAX_DIRECT = 45000;
+  if (transcript.length <= MAX_DIRECT) return transcript;
+
+  const HEAD_CHARS = 8000;
+  const TAIL_CHARS = 18000;
+  const MIDDLE_CHUNKS = 3;
+  const MIDDLE_CHARS = 5000;
+
+  const chunks: string[] = [
+    `[Transcript excerpt: beginning]\n${transcript.slice(0, HEAD_CHARS)}`,
+  ];
+
+  const middleStart = HEAD_CHARS;
+  const middleEnd = Math.max(middleStart, transcript.length - TAIL_CHARS);
+  const middleSpan = middleEnd - middleStart;
+
+  if (middleSpan > MIDDLE_CHARS) {
+    for (let i = 1; i <= MIDDLE_CHUNKS; i++) {
+      const offset = Math.floor((middleSpan - MIDDLE_CHARS) * (i / (MIDDLE_CHUNKS + 1)));
+      const start = middleStart + offset;
+      chunks.push(`[Transcript excerpt: middle checkpoint ${i}]\n${transcript.slice(start, start + MIDDLE_CHARS)}`);
+    }
+  }
+
+  chunks.push(`[Transcript excerpt: ending]\n${transcript.slice(-TAIL_CHARS)}`);
+  return chunks.join('\n\n[... transcript excerpt boundary ...]\n\n');
+}
+
+function normalizeMemoryType(type: string | undefined, index: number): MemoryType {
+  const allowed: MemoryType[] = ['session', 'observation', 'pattern', 'preference', 'fact', 'goal', 'insight'];
+  if (index === 0 && (!type || type === 'insight' || type === 'observation')) return 'session';
+  if (type && allowed.includes(type as MemoryType)) return type as MemoryType;
+  return index === 0 ? 'session' : 'observation';
+}
+
+function buildMemoryContent(entry: SessionObservationResponse, type: MemoryType): string {
+  if (type === 'session') {
+    const hasStructuredSections = Boolean(entry.context || entry.problems || entry.solutions || entry.followUp || entry.notes);
+    if (hasStructuredSections) {
+      return [
+        formatMemorySection('Context', entry.context),
+        formatMemorySection('Problems Being Solved', entry.problems),
+        formatMemorySection('Solutions Worked On', entry.solutions),
+        formatMemorySection('Follow-up', entry.followUp),
+        formatMemorySection('Notes', entry.notes),
+      ].join('\n\n');
+    }
+  }
+
+  if (entry.content?.trim()) return entry.content.trim();
+  return '';
+}
+
+function formatMemorySection(title: string, value: string | string[] | undefined): string {
+  const lines = normalizeSectionLines(value);
+  const body = lines.length > 0
+    ? lines.map(line => `- ${line}`).join('\n')
+    : '_None captured._';
+  return `## ${title}\n${body}`;
+}
+
+function normalizeSectionLines(value: string | string[] | undefined): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map(v => v.trim()).filter(Boolean);
+  }
+  return value
+    .split('\n')
+    .map(v => v.replace(/^[-*]\s+/, '').trim())
+    .filter(Boolean);
+}
+
+function summarizeContent(content: string): string {
+  return content
+    .replace(/^#+\s+/gm, '')
+    .replace(/\n+/g, ' ')
+    .slice(0, 220)
+    .trim();
 }
 
 // --- Generate custom role from a user prompt ---

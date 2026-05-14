@@ -55,7 +55,7 @@ vi.mock('./claude-context.js', () => ({
   formatOwnerContext: vi.fn().mockReturnValue(''),
 }));
 
-import { generateSoul, chat } from './api.js';
+import { generateSoul, extractSessionObservations, chat } from './api.js';
 import type { ClawmonBones, Clawmon, MemoryEntry } from './types.js';
 import type { Role } from './roles.js';
 
@@ -147,6 +147,75 @@ describe('generateSoul', () => {
         max_tokens: 300,
       }),
     );
+  });
+});
+
+describe('extractSessionObservations', () => {
+  it('formats session-end output into a structured Obsidian session memory', async () => {
+    mockCreate.mockResolvedValue({
+      content: [{
+        type: 'text',
+        text: JSON.stringify([
+          {
+            title: 'Session: 2026-05-14 12:30 -- richer Obsidian session notes',
+            description: 'Updated session-end extraction so future notes preserve context, problems, solutions, follow-up, and side notes.',
+            type: 'session',
+            context: ['Owner wanted session-end memories to be more descriptive in Obsidian.'],
+            problems: ['Existing notes were too thin and did not preserve the shape of the work.'],
+            solutions: ['Changed the extraction prompt to require structured sections.'],
+            followUp: ['Run focused tests and inspect the next saved note.'],
+            notes: ['Prefer explicit headings over loose narrative summaries.'],
+          },
+          {
+            title: 'Verify richer session notes after next hook run',
+            description: 'Check the next Red Queen note in Obsidian for the new section structure.',
+            type: 'goal',
+            content: 'After the next Claude Code session ends, inspect the generated Red Queen note and confirm it has Context, Problems Being Solved, Solutions Worked On, Follow-up, and Notes sections.',
+          },
+        ]),
+      }],
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 50 },
+    });
+
+    const memories = await extractSessionObservations(
+      testClawmon,
+      testRole,
+      'User asked to fix session-end transcript saving. Assistant updated the prompt and memory formatting.',
+    );
+
+    expect(memories).toHaveLength(2);
+    expect(memories[0]!.type).toBe('session');
+    expect(memories[0]!.content).toContain('## Context');
+    expect(memories[0]!.content).toContain('## Problems Being Solved');
+    expect(memories[0]!.content).toContain('## Solutions Worked On');
+    expect(memories[0]!.content).toContain('## Follow-up');
+    expect(memories[0]!.content).toContain('## Notes');
+    expect(memories[1]!.type).toBe('goal');
+
+    const prompt = mockCreate.mock.calls[0]![0].messages[0].content;
+    expect(prompt).toContain('Problems Being Solved');
+    expect(prompt).toContain('Solutions Worked On');
+  });
+
+  it('samples the middle of very long transcripts', async () => {
+    mockCreate.mockResolvedValue({
+      content: [{ type: 'text', text: '[]' }],
+      stop_reason: 'end_turn',
+      usage: { input_tokens: 100, output_tokens: 10 },
+    });
+
+    const longTranscript = [
+      'start '.repeat(2000),
+      'important middle decision '.repeat(2000),
+      'ending '.repeat(4000),
+    ].join('\n');
+
+    await extractSessionObservations(testClawmon, testRole, longTranscript);
+
+    const prompt = mockCreate.mock.calls[0]![0].messages[0].content;
+    expect(prompt).toContain('[Transcript excerpt: middle checkpoint 1]');
+    expect(prompt).toContain('[Transcript excerpt: ending]');
   });
 });
 

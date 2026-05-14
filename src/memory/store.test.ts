@@ -208,12 +208,14 @@ describe('memory', () => {
   });
 
   it('saves and loads a memory entry', async () => {
-    await saveMemory('test-penny', makeMemory());
+    const savedPath = await saveMemory('test-penny', makeMemory());
     const memories = await loadMemories('test-penny');
     expect(memories).toHaveLength(1);
     expect(memories[0]!.name).toBe('Savings goal');
     expect(memories[0]!.type).toBe('goal');
     expect(memories[0]!.content).toContain('€5,000');
+    expect(savedPath).toContain('savings-goal.md');
+    expect(existsSync(savedPath)).toBe(true);
   });
 
   it('saves multiple memories', async () => {
@@ -237,6 +239,25 @@ describe('memory', () => {
     await saveMemory('test-penny', makeMemory({ name: 'My Special Goal!!!' }));
     const dir = join(TEST_HOME, '.clawmon', 'clawmons', 'test-penny', 'memory');
     expect(existsSync(join(dir, 'my-special-goal.md'))).toBe(true);
+  });
+
+  it('quotes rich frontmatter values and loads them without quotes', async () => {
+    await saveMemory('test-penny', makeMemory({
+      name: 'Session: 2026-05-14 12:30 -- richer notes',
+      description: 'Context: problem, solution, and follow-up',
+      type: 'session',
+      content: '## Context\n- Detailed session context',
+    }));
+
+    const dir = join(TEST_HOME, '.clawmon', 'clawmons', 'test-penny', 'memory');
+    const raw = await readFile(join(dir, 'session-2026-05-14-12-30-richer-notes.md'), 'utf-8');
+    expect(raw).toContain('name: "Session: 2026-05-14 12:30 -- richer notes"');
+    expect(raw).toContain('description: "Context: problem, solution, and follow-up"');
+
+    const memories = await loadMemories('test-penny');
+    expect(memories[0]!.name).toBe('Session: 2026-05-14 12:30 -- richer notes');
+    expect(memories[0]!.description).toBe('Context: problem, solution, and follow-up');
+    expect(memories[0]!.type).toBe('session');
   });
 });
 

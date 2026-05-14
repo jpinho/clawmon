@@ -20,7 +20,7 @@
           {
             "type": "command",
             "command": "NODE_NO_WARNINGS=1 npx tsx /ABSOLUTE/PATH/TO/clawmon/src/index.ts session-end",
-            "timeout": 30
+            "timeout": 90
           }
         ]
       }

@@ -12,6 +12,7 @@ Clawmon memories are typed. The agent decides what to save and classifies it:
 
 | Type | When to save | Example |
 |------|-------------|---------|
+| **session** | Session-end transcript distillation | "Context, problems solved, solutions worked on, follow-up, and notes from a coding session" |
 | **goal** | Owner states an objective | "Save €5,000 by December" |
 | **preference** | Owner expresses how they like things | "Prefers direct feedback, no sugar-coating" |
 | **fact** | Owner states something about their life | "Works at a fintech startup in Berlin" |
@@ -167,7 +168,7 @@ What the code actually does today vs what this doc describes.
 
 | Feature | Status | Location |
 |---------|--------|----------|
-| Typed memory entries (6 types) | **Implemented** | `types.ts:114-121`, system prompt in `api.ts` |
+| Typed memory entries (7 types) | **Implemented** | `types.ts`, system prompt in `api.ts` |
 | Agent decides when to save | **Implemented** | System prompt instructs save behavior; agentic loop in `api.ts` |
 | File-based storage (markdown + YAML) | **Implemented** | `memory/store.ts:124-158` |
 | MEMORY.md index | **Implemented** | `memory/store.ts:148-158` |

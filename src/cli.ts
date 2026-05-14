@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { readFile, writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import {
   initClawmonDir,
   isInitialized,
@@ -440,6 +441,7 @@ program
       const typeColor = m.type === 'goal' ? chalk.green
         : m.type === 'pattern' ? chalk.yellow
         : m.type === 'preference' ? chalk.cyan
+        : m.type === 'session' ? chalk.blue
         : m.type === 'insight' ? chalk.magenta
         : chalk.dim;
       console.log(`  ${typeColor(`[${m.type}]`)} ${m.name}`);
@@ -764,11 +766,21 @@ program
 
     try {
       const observations = await extractSessionObservations(clawmon, role, transcript);
+      const savedPaths: Array<{ type: string; name: string; path: string }> = [];
       for (const obs of observations) {
-        await saveMemory(clawmon.id, obs);
+        const path = await saveMemory(clawmon.id, obs);
+        savedPaths.push({ type: obs.type, name: obs.name, path });
+      }
+      if (savedPaths.length > 0) {
+        console.log(`Clawmon saved ${savedPaths.length} memory${savedPaths.length === 1 ? '' : 'ies'} for ${clawmon.soul.name}:`);
+        for (const saved of savedPaths) {
+          console.log(`- [${saved.type}] ${saved.name}`);
+          console.log(`  ${pathToFileURL(saved.path).href}`);
+        }
+      } else {
+        console.log(`Clawmon saved no memories for ${clawmon.soul.name}.`);
       }
       dbg(`session-end: saved ${observations.length} observations for ${clawmon.soul.name}`);
-      // Silent by default -- hook should not produce noise unless in debug mode
     } catch (err) {
       dbg(`session-end: failed: ${err}`);
     }

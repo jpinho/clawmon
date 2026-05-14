@@ -232,7 +232,7 @@ Clawmons shouldn't wait for you to remember them. With Claude Code hooks, your p
 
 **SessionStart** -- your primary clawmon's context (role, feelings, active goals, recent observations) is automatically injected when you open Claude Code. No AI call. Instant.
 
-**SessionEnd** -- when you close Claude Code, your primary clawmon reads the transcript and extracts relevant observations, saving them as memories. One cheap Sonnet call, happens in the background.
+**SessionEnd** -- when you close Claude Code, your primary clawmon reads the transcript and saves a rich Obsidian session note with Context, Problems Being Solved, Solutions Worked On, Follow-up, and Notes, plus a few specific follow-up/fact memories. One model call, happens in the background, and prints the saved memory file links so you can verify them immediately.
 
 ```bash
 # Pick which clawmon greets and observes
